@@ -496,3 +496,79 @@ async def modbus_write_registers(
     if hasattr(response, "registers"):
         return response.registers
     return None
+
+
+# pylint: disable=too-many-arguments, too-many-positional-arguments
+async def modbus_write_register(
+    client: AsyncModbusSerialClient,
+    register: int,
+    value: int,
+    slave: int = 1,
+    logger: Optional[logging.Logger] = None,
+) -> Optional[int]:
+    """
+    Writes a value to Modbus holding register asynchronously using the provided
+    client.
+
+    This function connects to the Modbus device, writes the provided values to the specified
+    holding registers, and handles the response. It logs the operation and any errors if a logger
+    is provided. The connection is always closed after execution, regardless of success or failure.
+
+    Args:
+        client (AsyncModbusSerialClient):
+            The asynchronous Modbus serial client used to communicate with the Modbus device.
+        register (int):
+            The address of the holding register to write to.
+        value (int):
+            A value to write to the holding register.
+        slave (int, optional):
+            The slave ID of the Modbus device. Defaults to 1.
+        logger (logging.Logger, optional):
+            An optional logger instance for logging debug information and errors. If not provided,
+            no logging is performed.
+
+    Returns:
+        Optional[int]:
+            A written register value if the write operation is successful. Returns None if
+            an error occurs, the client fails to connect, or the response does not contain valid
+            register data.
+
+    Raises:
+        ModbusException:
+            If an error occurs during the execution of the Modbus write operation.
+
+    Notes:
+        - The function ensures that the client connection is closed after execution, even if an
+          error occurs.
+        - Errors and exceptions are logged if a logger is provided.
+        - The function writes to holding register and expects a response containing the written
+          value.
+    """
+    if logger:
+        logger.debug(
+            "%s: Writing data to register %i", client.comm_params.comm_name, register
+        )
+    await client.connect()
+    try:
+        response = await client.write_register(register, value, slave=slave)
+    except ModbusException as e:
+        if logger:
+            logger.error(
+                "%s: Modbus Exception on write register %s",
+                client.comm_params.comm_name,
+                e,
+            )
+        client.close()
+        return None
+    client.close()
+    if response.isError():
+        if logger:
+            logger.error(
+                "%s: Received exception from device (%s)",
+                client.comm_params.comm_name,
+                response,
+            )
+        return None
+    if hasattr(response, "registers"):
+        return response.registers[0]
+    return None

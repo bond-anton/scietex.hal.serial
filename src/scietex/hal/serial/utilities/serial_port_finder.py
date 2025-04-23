@@ -1,4 +1,5 @@
 """Find serial ports by VID/PID."""
+
 import serial.tools.list_ports
 
 
@@ -6,14 +7,10 @@ import serial.tools.list_ports
 STM_VID = 0x0483  # STMicroelectronics
 STM_PID = 0x5740  # CDC Virtual COM Port
 
-STM_CDC_DEVICES = {
-    STM_VID: [STM_PID]
-}
+STM_CDC_DEVICES = {STM_VID: [STM_PID]}
 
 # RS485 usb converter constants.
-RS485_DEVICES = {
-    0x1a86: [0x7523]  # Sunplus Technology Inc.
-}
+RS485_DEVICES = {0x1A86: [0x7523]}  # Sunplus Technology Inc.
 
 
 def find_serial_ports(vid_pid_mapping: dict[int, list[int]]):

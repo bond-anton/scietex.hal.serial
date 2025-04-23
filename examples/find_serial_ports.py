@@ -1,8 +1,10 @@
 """Example of find_serial_ports utility usage."""
 
-
 from scietex.hal.serial.utilities.serial_port_finder import (
-    find_serial_ports, find_rs485, find_stm32_cdc, STM_CDC_DEVICES
+    find_serial_ports,
+    find_rs485,
+    find_stm32_cdc,
+    STM_CDC_DEVICES,
 )
 
 print("STM32 CDC devices mapping:", STM_CDC_DEVICES)

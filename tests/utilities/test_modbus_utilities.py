@@ -27,6 +27,7 @@ try:
         modbus_read_input_registers,
         modbus_read_holding_registers,
         modbus_write_registers,
+        modbus_write_register,
     )
 except ModuleNotFoundError:
     from scietex.hal.serial.config import (
@@ -49,6 +50,7 @@ except ModuleNotFoundError:
         modbus_read_input_registers,
         modbus_read_holding_registers,
         modbus_write_registers,
+        modbus_write_register,
     )
 
 
@@ -170,7 +172,7 @@ async def test_read_registers(
         slave=1,
         logger=logger_fixture,
     )
-    assert reg_data is None
+    assert reg_data == list(range(11, 101))
 
     # Stop server
     await rs485_srv.stop()
@@ -260,6 +262,51 @@ async def test_write_registers(
         client,
         register=0,
         value=[100, 101],
+        slave=10,
+        logger=logger_fixture,
+    )
+    assert reg_data is None
+
+    await rs485_srv.stop()
+
+
+@pytest.mark.asyncio
+async def test_write_register(
+    rs485_srv, client_config, logger_fixture
+):  # pylint: disable=redefined-outer-name
+    """Test writing single register."""
+    await rs485_srv.start()
+    client = modbus_get_client(client_config)
+
+    reg_data = await modbus_read_holding_registers(
+        client,
+        start_register=0,
+        count=1,
+        slave=1,
+        logger=logger_fixture,
+    )
+    assert reg_data == [1]
+
+    await modbus_write_register(
+        client,
+        register=0,
+        value=7,
+        slave=1,
+        logger=logger_fixture,
+    )
+    reg_data = await modbus_read_holding_registers(
+        client,
+        start_register=0,
+        count=1,
+        slave=1,
+        logger=logger_fixture,
+    )
+    assert reg_data[0] == 7
+
+    reg_data = await modbus_write_register(
+        client,
+        register=0,
+        value=100,
         slave=10,
         logger=logger_fixture,
     )

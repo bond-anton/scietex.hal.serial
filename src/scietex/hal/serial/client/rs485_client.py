@@ -30,6 +30,7 @@ from ..utilities.modbus import (
     modbus_execute,
     modbus_read_registers,
     modbus_write_registers,
+    modbus_write_register,
 )
 
 from ..utilities.numeric import (
@@ -215,17 +216,17 @@ class RS485Client:
         if signed:
             value = from_signed16(value)
 
-        response = await modbus_write_registers(
+        response = await modbus_write_register(
             self.client,
             register=register,
-            value=[value],
+            value=value,
             slave=self.address,
             logger=self.logger,
         )
         if response:
             if signed:
-                return to_signed16(response[0])
-            return response[0]
+                return to_signed16(response)
+            return response
         return await self.read_register(register, holding=True, signed=signed)
 
     async def read_register_float(
