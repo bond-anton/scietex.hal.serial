@@ -171,6 +171,17 @@ async def test_write_registers(
     # )
     # assert value is None
 
+    values = [1, 2, 3]
+    resp = await client.write_registers(0, values, signed=False)
+    assert values == resp
+
+    values = [1, 2, -365]
+    resp = await client.write_registers(0, values, signed=True)
+    assert values == resp
+
+    resp = await client.read_registers(0, 3, signed=True)
+    assert values == resp
+
     await rs485_srv.stop()
 
 

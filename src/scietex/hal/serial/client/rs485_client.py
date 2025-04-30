@@ -137,7 +137,11 @@ class RS485Client:
         )
 
     async def read_registers(
-        self, start_register: int = 0, count: int = 1, holding: bool = True
+        self,
+        start_register: int = 0,
+        count: int = 1,
+        holding: bool = True,
+        signed: bool = False,
     ) -> Optional[list[int]]:
         """
         Read data from Modbus registers.
@@ -150,13 +154,15 @@ class RS485Client:
             holding (bool, optional):
                 If True, reads holding registers; otherwise, reads input registers.
                 Defaults to True.
+            signed (bool, optional):
+                If True, interprets the register value as a signed integer. Defaults to False.
 
         Returns:
             Union[list[int], None]:
                 A list of register values if the read operation is successful. Returns None if an
                 error occurs or the response is invalid.
         """
-        return await modbus_read_registers(
+        response = await modbus_read_registers(
             self.client,
             start_register=start_register,
             count=count,
@@ -164,6 +170,12 @@ class RS485Client:
             holding=holding,
             logger=self.logger,
         )
+        if response is not None:
+            if signed:
+                for i, _ in enumerate(response):
+                    response[i] = to_signed16(response[i])
+            return response
+        return None
 
     async def read_register(
         self, register: int, holding: bool = True, signed: bool = False
@@ -194,6 +206,46 @@ class RS485Client:
             return response[0]
         return None
 
+    async def write_registers(
+        self, start_register: int, values: list[int], signed: bool = False
+    ) -> Optional[list[int]]:
+        """
+        Write data to a single Modbus register.
+
+        Args:
+            start_register (int):
+                The address of the starting register to write to.
+            values (list[int]):
+                The values to write to the registers.
+            signed (bool, optional):
+                If True, interprets the value as a signed integer. Defaults to False.
+
+        Returns:
+            Optional[int]:
+                The written register value as an integer. Returns None if an error occurs or the
+                response is invalid.
+        """
+        _values = list(values)
+        if signed:
+            for i, _ in enumerate(values):
+                _values[i] = from_signed16(values[i])
+
+        response = await modbus_write_registers(
+            self.client,
+            register=start_register,
+            value=_values,
+            slave=self.address,
+            logger=self.logger,
+        )
+        if response:
+            if signed:
+                for i, _ in enumerate(response):
+                    response[i] = to_signed16(response[i])
+            return response
+        return await self.read_registers(
+            start_register, count=len(values), holding=True, signed=signed
+        )
+
     async def write_register(
         self, register: int, value: int, signed: bool = False
     ) -> Optional[int]:
@@ -214,12 +266,14 @@ class RS485Client:
                 response is invalid.
         """
         if signed:
-            value = from_signed16(value)
+            _v = from_signed16(value)
+        else:
+            _v = value
 
         response = await modbus_write_register(
             self.client,
             register=register,
-            value=value,
+            value=_v,
             slave=self.address,
             logger=self.logger,
         )
@@ -407,8 +461,10 @@ class RS485Client:
                 is invalid.
         """
         if signed:
-            value = from_signed32(value)
-        value_a, value_b = split_32bit(value, byteorder)
+            _v = from_signed32(value)
+        else:
+            _v = value
+        value_a, value_b = split_32bit(_v, byteorder)
         response = await modbus_write_registers(
             self.client,
             register=start_register,
