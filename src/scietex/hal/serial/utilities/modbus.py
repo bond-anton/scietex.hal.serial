@@ -481,13 +481,14 @@ async def modbus_write_registers(
             register, value, slave=slave, no_response_expected=no_response_expected
         )
     except ModbusException as e:
-        if logger:
-            logger.error(
-                "%s: Modbus Exception on write register %s",
-                client.comm_params.comm_name,
-                e,
-            )
         client.close()
+        if not no_response_expected:
+            if logger:
+                logger.error(
+                    "%s: Modbus Exception on write register %s",
+                    client.comm_params.comm_name,
+                    e,
+                )
         return None
     client.close()
     if response.isError():
@@ -562,13 +563,14 @@ async def modbus_write_register(
             register, value, slave=slave, no_response_expected=no_response_expected
         )
     except ModbusException as e:
-        if logger:
-            logger.error(
-                "%s: Modbus Exception on write register %s",
-                client.comm_params.comm_name,
-                e,
-            )
         client.close()
+        if not no_response_expected:
+            if logger:
+                logger.error(
+                    "%s: Modbus Exception on write register %s",
+                    client.comm_params.comm_name,
+                    e,
+                )
         return None
     client.close()
     if response.isError():
