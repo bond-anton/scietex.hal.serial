@@ -426,6 +426,7 @@ async def modbus_write_registers(
     value: List[int],
     slave: int = 1,
     logger: Optional[logging.Logger] = None,
+    no_response_expected: bool = False,
 ) -> Optional[list[int]]:
     """
     Writes a sequence of values to Modbus holding registers asynchronously using the provided
@@ -447,6 +448,8 @@ async def modbus_write_registers(
         logger (logging.Logger, optional):
             An optional logger instance for logging debug information and errors. If not provided,
             no logging is performed.
+        no_response_expected (bool):
+            If True, do not wait for the slave response. Defaults to False.
 
     Returns:
         Optional[list[int]]:
@@ -474,7 +477,9 @@ async def modbus_write_registers(
         )
     await client.connect()
     try:
-        response = await client.write_registers(register, value, slave=slave)
+        response = await client.write_registers(
+            register, value, slave=slave, no_response_expected=no_response_expected
+        )
     except ModbusException as e:
         if logger:
             logger.error(
@@ -505,6 +510,7 @@ async def modbus_write_register(
     value: int,
     slave: int = 1,
     logger: Optional[logging.Logger] = None,
+    no_response_expected: bool = False,
 ) -> Optional[int]:
     """
     Writes a value to Modbus holding register asynchronously using the provided
@@ -526,6 +532,8 @@ async def modbus_write_register(
         logger (logging.Logger, optional):
             An optional logger instance for logging debug information and errors. If not provided,
             no logging is performed.
+        no_response_expected (bool):
+            If True, do not wait for the slave response. Defaults to False.
 
     Returns:
         Optional[int]:
@@ -550,7 +558,9 @@ async def modbus_write_register(
         )
     await client.connect()
     try:
-        response = await client.write_register(register, value, slave=slave)
+        response = await client.write_register(
+            register, value, slave=slave, no_response_expected=no_response_expected
+        )
     except ModbusException as e:
         if logger:
             logger.error(

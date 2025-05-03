@@ -254,7 +254,11 @@ class RS485Client:
         return None
 
     async def write_registers(
-        self, start_register: int, values: list[int], signed: bool = False
+        self,
+        start_register: int,
+        values: list[int],
+        signed: bool = False,
+        no_response_expected: bool = False,
     ) -> Optional[list[int]]:
         """
         Write data to a single Modbus register.
@@ -266,6 +270,8 @@ class RS485Client:
                 The values to write to the registers.
             signed (bool, optional):
                 If True, interprets the value as a signed integer. Defaults to False.
+            no_response_expected (bool):
+                If True, do not wait for the slave response. Defaults to False.
 
         Returns:
             Optional[int]:
@@ -283,18 +289,25 @@ class RS485Client:
             value=_values,
             slave=self.address,
             logger=self.logger,
+            no_response_expected=no_response_expected,
         )
         if response:
             if signed:
                 for i, _ in enumerate(response):
                     response[i] = to_signed16(response[i])
             return response
+        if no_response_expected:
+            return None
         return await self.read_registers(
             start_register, count=len(values), holding=True, signed=signed
         )
 
     async def write_register(
-        self, register: int, value: int, signed: bool = False
+        self,
+        register: int,
+        value: int,
+        signed: bool = False,
+        no_response_expected: bool = False,
     ) -> Optional[int]:
         """
         Write data to a single Modbus register.
@@ -306,6 +319,8 @@ class RS485Client:
                 The value to write to the register.
             signed (bool, optional):
                 If True, interprets the value as a signed integer. Defaults to False.
+            no_response_expected (bool):
+                If True, do not wait for the slave response. Defaults to False.
 
         Returns:
             Optional[int]:
@@ -323,11 +338,14 @@ class RS485Client:
             value=_v,
             slave=self.address,
             logger=self.logger,
+            no_response_expected=no_response_expected,
         )
         if response:
             if signed:
                 return to_signed16(response)
             return response
+        if no_response_expected:
+            return None
         return await self.read_register(register, holding=True, signed=signed)
 
     async def read_register_float(
@@ -365,7 +383,12 @@ class RS485Client:
         return None
 
     async def write_register_float(
-        self, register: int, value: float, factor: int = 100, signed: bool = False
+        self,
+        register: int,
+        value: float,
+        factor: int = 100,
+        signed: bool = False,
+        no_response_expected: bool = False,
     ) -> Optional[float]:
         """
         Write a float value to a single Modbus register.
@@ -381,6 +404,8 @@ class RS485Client:
                 The multiplier used to scale the float value into an integer. Defaults to 100.
             signed (bool, optional):
                 If True, interprets the value as a signed integer. Defaults to False.
+            no_response_expected (bool):
+                If True, do not wait for the slave response. Defaults to False.
 
         Returns:
             Optional[float]:
@@ -388,12 +413,17 @@ class RS485Client:
                 invalid.
         """
         response: Optional[int] = await self.write_register(
-            register, float_to_unsigned16(value, factor), signed=False
+            register,
+            float_to_unsigned16(value, factor),
+            signed=False,
+            no_response_expected=no_response_expected,
         )
         if response:
             if signed:
                 return float_from_unsigned16(response, factor)
             return float_from_int(response, factor)
+        if no_response_expected:
+            return None
         return await self.read_register_float(register, factor, signed=signed)
 
     async def read_two_registers_int(
@@ -487,6 +517,7 @@ class RS485Client:
         value: int,
         byteorder: ByteOrder = ByteOrder.LITTLE_ENDIAN,
         signed: bool = False,
+        no_response_expected: bool = False,
     ) -> Optional[int]:
         """
         Write a 32-bit integer value to two Modbus registers.
@@ -501,6 +532,8 @@ class RS485Client:
                 Defaults to `ByteOrder.LITTLE_ENDIAN`.
             signed (bool, optional):
                 If True, interprets the value as a signed integer. Defaults to False.
+            no_response_expected (bool):
+                If True, do not wait for the slave response. Defaults to False.
 
         Returns:
             Optional[int]:
@@ -518,12 +551,15 @@ class RS485Client:
             value=[value_a, value_b],
             slave=self.address,
             logger=self.logger,
+            no_response_expected=no_response_expected,
         )
         if response and len(response) == 2:
             val = combine_32bit(response[0], response[1], byteorder)
             if signed:
                 return to_signed32(val)
             return val
+        if no_response_expected:
+            return None
         return await self.read_two_registers_int(
             start_register=start_register,
             holding=True,
@@ -538,6 +574,7 @@ class RS485Client:
         factor: Union[int, float] = 100,
         byteorder: ByteOrder = ByteOrder.LITTLE_ENDIAN,
         signed: bool = False,
+        no_response_expected: bool = False,
     ) -> Optional[float]:
         """
         Write a float value to two Modbus registers.
@@ -557,6 +594,8 @@ class RS485Client:
                 Defaults to `ByteOrder.LITTLE_ENDIAN`.
             signed (bool, optional):
                 If True, interprets the value as a signed integer. Defaults to False.
+            no_response_expected (bool):
+                If True, do not wait for the slave response. Defaults to False.
 
         Returns:
             Optional[float]:
@@ -568,12 +607,18 @@ class RS485Client:
         """
         value_int: int = int(round(value * factor))
         response: Optional[int] = await self.write_two_registers(
-            start_register, value_int, byteorder, signed
+            start_register,
+            value_int,
+            byteorder,
+            signed,
+            no_response_expected=no_response_expected,
         )
         if response is not None:
             if signed:
                 return float_from_unsigned32(response, factor)
             return float_from_int(response, factor)
+        if no_response_expected:
+            return None
         return await self.read_two_registers_float(
             start_register, factor, signed=signed
         )
