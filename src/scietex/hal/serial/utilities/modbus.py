@@ -492,12 +492,13 @@ async def modbus_write_registers(
         return None
     client.close()
     if response.isError():
-        if logger:
-            logger.error(
-                "%s: Received exception from device (%s)",
-                client.comm_params.comm_name,
-                response,
-            )
+        if not no_response_expected:
+            if logger:
+                logger.error(
+                    "%s: Received exception from device (%s)",
+                    client.comm_params.comm_name,
+                    response,
+                )
         return None
     if hasattr(response, "registers"):
         return response.registers
@@ -574,12 +575,13 @@ async def modbus_write_register(
         return None
     client.close()
     if response.isError():
-        if logger:
-            logger.error(
-                "%s: Received exception from device (%s)",
-                client.comm_params.comm_name,
-                response,
-            )
+        if no_response_expected:
+            if logger:
+                logger.error(
+                    "%s: Received exception from device (%s)",
+                    client.comm_params.comm_name,
+                    response,
+                )
         return None
     if hasattr(response, "registers"):
         return response.registers[0]
