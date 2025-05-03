@@ -75,19 +75,19 @@ class RS485Client:
             is used.
 
     Attributes:
-        con_params (Union[SerialConnectionConfigModel, ModbusSerialConnectionConfigModel]):
+        _con_params (Union[SerialConnectionConfigModel, ModbusSerialConnectionConfigModel]):
             Configuration parameters for the serial connection.
         client (AsyncModbusSerialClient):
             The Modbus client instance used for communication.
         address (int):
             The slave address of the Modbus device.
-        label (str):
+        _label (str):
             A label for the client, used for logging and identification.
         logger (Logger):
             The logger instance used for logging client activities.
     """
 
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
+    # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-instance-attributes
     def __init__(
         self,
         con_params: Union[
@@ -100,20 +100,67 @@ class RS485Client:
         custom_response: Optional[list[type[ModbusPDU]]] = None,
         logger: Optional[Logger] = None,
     ):
-        self.con_params: Union[
+        self._con_params: Union[
             SerialConnectionConfigModel, ModbusSerialConnectionConfigModel
         ] = con_params
+        self._custom_framer = custom_framer
+        self._custom_decoder = custom_decoder
+        self._custom_response = custom_response
+        self._label: str = label
+
         self.client: AsyncModbusSerialClient = modbus_get_client(
-            con_params, custom_framer, custom_decoder, custom_response, label
+            self._con_params,
+            self._custom_framer,
+            self._custom_decoder,
+            self._custom_response,
+            self._label,
         )
 
         self.address: int = address
-        self.label: str = label
         self.logger: Logger
         if logger is None:
             self.logger = getLogger()
         else:
             self.logger = logger
+
+    @property
+    def con_params(
+        self,
+    ) -> Union[SerialConnectionConfigModel, ModbusSerialConnectionConfigModel]:
+        """Connection parameters"""
+        return self._con_params
+
+    @con_params.setter
+    def con_params(
+        self,
+        params: Union[SerialConnectionConfigModel, ModbusSerialConnectionConfigModel],
+    ) -> None:
+        self._con_params = params
+        self.client.close()
+        self.client = modbus_get_client(
+            self._con_params,
+            self._custom_framer,
+            self._custom_decoder,
+            self._custom_response,
+            self._label,
+        )
+
+    @property
+    def label(self) -> str:
+        """Client label."""
+        return self._label
+
+    @label.setter
+    def label(self, new_label: str) -> None:
+        self._label = new_label
+        self.client.close()
+        self.client = modbus_get_client(
+            self._con_params,
+            self._custom_framer,
+            self._custom_decoder,
+            self._custom_response,
+            self._label,
+        )
 
     async def execute(
         self, request: ModbusPDU, no_response_expected: bool = False
