@@ -9,7 +9,7 @@ The package is structured into four main modules, each serving a distinct purpos
 - server: Implements a Modbus server to streamline communication between various
   devices and applications.
 - client: Provides a Modbus client that can be customized to interact with a
-  wide range of equipment.
+  wide range of the equipment.
 
 ## System Requirements
 
