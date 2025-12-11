@@ -33,10 +33,10 @@ def test_generate_serial_pair():
     # Receive the serial port names from the thread
     response = parent_conn.recv()
     assert response["status"] == "OK"
-    serial_port_1 = response["data"]
+    serial_port_1 = response["payload"]
     response = parent_conn.recv()
     assert response["status"] == "OK"
-    serial_port_2 = response["data"]
+    serial_port_2 = response["payload"]
 
     # Verify that the serial ports were created
     assert serial_port_1
@@ -46,26 +46,28 @@ def test_generate_serial_pair():
     response = parent_conn.recv()
     assert response["status"] == "ERROR"
 
-    parent_conn.send({"cmd": "remove", "data": [serial_port_1]})
+    parent_conn.send({"cmd": "remove", "payload": [serial_port_1]})
     response = parent_conn.recv()
     assert response["status"] == "OK"
-    assert serial_port_1 == response["data"]
+    assert serial_port_1 == response["payload"]
 
-    parent_conn.send({"cmd": "remove", "data": [serial_port_1]})
+    parent_conn.send({"cmd": "remove", "payload": [serial_port_1]})
     response = parent_conn.recv()
     assert response["status"] == "NOT_EXIST"
-    assert serial_port_1 == response["data"]
+    assert serial_port_1 == response["payload"]
 
-    parent_conn.send({"cmd": "create", "data": 1})
+    parent_conn.send({"cmd": "create", "payload": 1})
     response = parent_conn.recv()
     assert response["status"] == "OK"
-    serial_port_1 = response["data"]
+    serial_port_1 = response["payload"]
 
-    parent_conn.send({"cmd": "add", "data": [{"port": serial_port_1}]})
+    parent_conn.send({"cmd": "add", "payload": [{"port": serial_port_1}]})
     response = parent_conn.recv()
     assert response["status"] == "EXIST"
 
-    parent_conn.send({"cmd": "add", "data": [{"port": "/dev/unknown_serial_port_1"}]})
+    parent_conn.send(
+        {"cmd": "add", "payload": [{"port": "/dev/unknown_serial_port_1"}]}
+    )
     response = parent_conn.recv()
     assert response["status"] == "ERROR"
 
@@ -91,14 +93,14 @@ def test_generate_serial_pair_with_error():
         # Receive the error from the thread
         response = parent_conn.recv()
         assert response["status"] == "ERROR"
-        assert response["data"]["error"] == "Failed to create pseudo-terminal"
+        assert response["payload"]["error"] == "Failed to create pseudo-terminal"
 
     parent_conn.send({"cmd": "STOP"})
     thread.join()
 
 
 def test_communication_thread():
-    """Test that data can be sent and received between the virtual serial ports.
+    """Test that payload can be sent and received between the virtual serial ports.
     Run generate_serial_pair in a thread for coverage purpose."""
     parent_conn, child_conn = Pipe()
     serial_ports = [None, None, None]
@@ -110,7 +112,7 @@ def test_communication_thread():
 
     for i in range(3):
         response = parent_conn.recv()
-        serial_ports[i] = response["data"]
+        serial_ports[i] = response["payload"]
 
     parent_conn2, child_conn2 = Pipe()
     serial_ports2 = [None, None]
@@ -122,9 +124,9 @@ def test_communication_thread():
 
     for i in range(2):
         response = parent_conn2.recv()
-        serial_ports2[i] = response["data"]
+        serial_ports2[i] = response["payload"]
 
-    parent_conn2.send({"cmd": "add", "data": [{"port": serial_ports[2]}]})
+    parent_conn2.send({"cmd": "add", "payload": [{"port": serial_ports[2]}]})
     response = parent_conn2.recv()
     assert response["status"] == "OK"
 
@@ -134,15 +136,15 @@ def test_communication_thread():
         with open(serial_ports[1], "rb", buffering=0) as port2:
             # Open the second serial port for reading
             with open(serial_ports2[0], "rb", buffering=0) as port3:
-                # Send data from port1
+                # Send payload from port1
                 test_data = b"Hello, World!"
                 port1.write(test_data)
 
-                # Read data from port2
+                # Read payload from port2
                 received_data = port2.read(len(test_data))
                 assert received_data == test_data
                 time.sleep(0.1)
-                # Read data from port3
+                # Read payload from port3
                 received_data = port3.read(len(test_data))
                 assert received_data == test_data
 

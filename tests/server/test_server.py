@@ -45,16 +45,16 @@ async def test_initialization(
     assert server.identity.ModelName == SERVER_INFO["ModelName"]
     assert server.identity.MajorMinorRevision == SERVER_INFO["MajorMinorRevision"]
 
-    # Test initialization with a slave
-    server_with_slave = RS485Server(config, slaves=single_slave_fixture)
-    assert server_with_slave.slaves == single_slave_fixture
+    # Test initialization with a device_id
+    server_with_slave = RS485Server(config, devices=single_slave_fixture)
+    assert server_with_slave.devices == single_slave_fixture
 
-    server_with_slave = RS485Server(config, slaves={})
-    assert server_with_slave.slaves == {}
+    server_with_slave = RS485Server(config, devices={})
+    assert server_with_slave.devices == {}
     await server_with_slave.update_slave(1, store_fixture)
-    assert server_with_slave.slaves == {1: store_fixture}
+    assert server_with_slave.devices == {1: store_fixture}
     await server_with_slave.remove_slave(1)
-    assert server_with_slave.slaves == {}
+    assert server_with_slave.devices == {}
 
     # Test initialization with a logger
     server_with_logger = RS485Server(config, logger=logger_fixture)
@@ -91,14 +91,14 @@ async def test_start_stop_restart(
 async def test_update_slaves(
     rs485_srv, store_fixture
 ):  # pylint: disable=redefined-outer-name
-    """Test update slaves."""
+    """Test update devices."""
     await rs485_srv.start()
     await rs485_srv.remove_slave(1)
-    assert rs485_srv.slaves == {}
+    assert rs485_srv.devices == {}
     await rs485_srv.update_slave(1, store_fixture)
-    assert rs485_srv.slaves == {1: store_fixture}
+    assert rs485_srv.devices == {1: store_fixture}
     await rs485_srv.update_slave(2, store_fixture)
-    assert rs485_srv.slaves == {1: store_fixture, 2: store_fixture}
+    assert rs485_srv.devices == {1: store_fixture, 2: store_fixture}
     await rs485_srv.stop()
 
 
@@ -110,16 +110,16 @@ async def test_read_registers(
     await rs485_srv.start()
     client = AsyncModbusSerialClient(**modbus_connection_config(client_config))
     await client.connect()
-    response = await client.read_discrete_inputs(address=0, count=100, slave=1)
+    response = await client.read_discrete_inputs(address=0, count=100, device_id=1)
     assert hasattr(response, "bits")
     assert response.bits[:100] == [1] * 100
-    response = await client.read_coils(address=0, count=100, slave=1)
+    response = await client.read_coils(address=0, count=100, device_id=1)
     assert hasattr(response, "bits")
     assert response.bits[:100] == [0] * 100
-    response = await client.read_input_registers(address=0, count=100, slave=1)
+    response = await client.read_input_registers(address=0, count=100, device_id=1)
     assert hasattr(response, "registers")
     assert response.registers == list(range(1, 101))
-    response = await client.read_holding_registers(address=0, count=100, slave=1)
+    response = await client.read_holding_registers(address=0, count=100, device_id=1)
     assert hasattr(response, "registers")
     assert response.registers == list(range(1, 101))
     client.close()
@@ -135,14 +135,14 @@ async def test_write_registers(
     client = AsyncModbusSerialClient(**modbus_connection_config(client_config))
     await client.connect()
 
-    response = await client.read_holding_registers(address=0, count=100, slave=1)
+    response = await client.read_holding_registers(address=0, count=100, device_id=1)
     assert hasattr(response, "registers")
     assert response.registers == list(range(1, 101))
 
-    response = await client.write_registers(address=0, values=[9, 8, 7], slave=1)
+    response = await client.write_registers(address=0, values=[9, 8, 7], device_id=1)
     assert hasattr(response, "registers")
 
-    response = await client.read_holding_registers(address=0, count=3, slave=1)
+    response = await client.read_holding_registers(address=0, count=3, device_id=1)
     assert hasattr(response, "registers")
     assert response.registers == [9, 8, 7]
 

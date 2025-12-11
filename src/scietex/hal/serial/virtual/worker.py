@@ -1,9 +1,9 @@
 """
 Worker function for serial network creation and management.
 
-This module handles the generation, addition, removal, and data forwarding for virtual and physical
-serial ports. It provides functions to manage a virtual network of serial devices, ensuring proper
-handling of incoming commands and data exchange between connected ports.
+This module handles the generation, addition, removal, and payload forwarding for virtual and
+physical serial ports. It provides functions to manage a virtual network of serial devices,
+ensuring proper handling of incoming commands and payload exchange between connected ports.
 
 Functions:
     - generate_virtual_ports(stack, selector, ports_number, master_files, slave_names,
@@ -14,12 +14,12 @@ Functions:
     - remove_ports(selector, remove_list, master_files, slave_names, worker_io):
         Removes specified ports from the virtual network.
     - forward_data(selector, master_files, loopback=False):
-        Forwards data between connected ports in the virtual network.
+        Forwards payload between connected ports in the virtual network.
     - process_cmd(stack, selector, master_files, slave_names, worker_io, openpty_func=None):
         Processes incoming commands from the worker I/O connection.
     - create_serial_network(worker_io, ports_number=2, external_ports=None,
         loopback=False, openpty_func=pty.openpty):
-        Creates a virtual network of serial ports and manages data flow between them.
+        Creates a virtual network of serial ports and manages payload flow between them.
 
 Raises:
     Various exceptions may occur during port operations, such as IOErrors or configuration errors.
@@ -29,7 +29,7 @@ This module enables developers to simulate and test complex serial device intera
 relying on physical hardware, making it ideal for testing and debugging scenarios.
 """
 
-from typing import List, Optional, Union, Callable, BinaryIO
+from typing import Optional, Callable, BinaryIO
 import os
 import pty
 import tty
@@ -56,7 +56,7 @@ def generate_virtual_ports(
 
     This function creates the specified number of virtual serial ports using the provided openpty
     function. Each created port is registered with the selector and added to the master files and
-    slave names dictionaries.
+    device_id names dictionaries.
 
     Args:
         stack (ExitStack): Context manager for resource cleanup.
@@ -64,7 +64,7 @@ def generate_virtual_ports(
         ports_number (int): Number of virtual ports to generate.
         master_files (dict): Dictionary mapping master file descriptors to their corresponding
             objects.
-        slave_names (dict): Dictionary mapping slave names to their associated master file
+        slave_names (dict): Dictionary mapping device_id names to their associated master file
             descriptors.
         worker_io (Connection): Worker I/O connection for communicating status updates.
         openpty_func (Optional[Callable], optional): Function to open pseudo-terminal pairs.
@@ -85,13 +85,13 @@ def generate_virtual_ports(
             slave_names[slave_name] = master_fd
             stack.enter_context(master_files[master_fd])
             selector.register(master_fd, EVENT_READ)
-            worker_io.send({"status": "OK", "data": slave_name})
+            worker_io.send({"status": "OK", "payload": slave_name})
         # pylint: disable=broad-exception-caught
         except Exception as e:
             worker_io.send(
                 {
                     "status": "ERROR",
-                    "data": {"error": str(e), "traceback": traceback.format_exc()},
+                    "payload": {"error": str(e), "traceback": traceback.format_exc()},
                 }
             )
 
@@ -100,7 +100,7 @@ def generate_virtual_ports(
 def add_external_ports(
     stack: ExitStack,
     selector: Selector,
-    external_ports: List[dict],
+    external_ports: list[dict],
     master_files: dict,
     slave_names: dict,
     worker_io: Connection,
@@ -114,11 +114,11 @@ def add_external_ports(
     Args:
         stack (ExitStack): Context manager for resource cleanup.
         selector (Selector): Selector instance for event monitoring.
-        external_ports (List[dict]): List of dictionaries containing configuration details
+        external_ports (list[dict]): List of dictionaries containing configuration details
             for external ports.
         master_files (dict): Dictionary mapping master file descriptors to their corresponding
             objects.
-        slave_names (dict): Dictionary mapping slave names to their associated master file
+        slave_names (dict): Dictionary mapping device_id names to their associated master file
             descriptors.
         worker_io (Connection): Worker I/O connection for communicating status updates.
 
@@ -127,7 +127,7 @@ def add_external_ports(
     """
     for con_params in external_ports:
         if con_params["port"] in slave_names:
-            worker_io.send({"status": "EXIST", "data": con_params["port"]})
+            worker_io.send({"status": "EXIST", "payload": con_params["port"]})
         else:
             try:
                 port = Serial(**con_params)
@@ -137,20 +137,23 @@ def add_external_ports(
                 slave_names[con_params["port"]] = port_fd
                 stack.enter_context(master_files[port_fd])
                 selector.register(port_fd, EVENT_READ)
-                worker_io.send({"status": "OK", "data": con_params["port"]})
+                worker_io.send({"status": "OK", "payload": con_params["port"]})
             # pylint: disable=broad-exception-caught
             except Exception as e:
                 worker_io.send(
                     {
                         "status": "ERROR",
-                        "data": {"error": str(e), "traceback": traceback.format_exc()},
+                        "payload": {
+                            "error": str(e),
+                            "traceback": traceback.format_exc(),
+                        },
                     }
                 )
 
 
 def remove_ports(
     selector: Selector,
-    remove_list: List[str],
+    remove_list: list[str],
     master_files: dict,
     slave_names: dict,
     worker_io: Connection,
@@ -163,10 +166,10 @@ def remove_ports(
 
     Args:
         selector (Selector): Selector instance for event monitoring.
-        remove_list (List[str]): List of slave names to remove from the network.
+        remove_list (list[str]): List of device_id names to remove from the network.
         master_files (dict): Dictionary mapping master file descriptors to their corresponding
             objects.
-        slave_names (dict): Dictionary mapping slave names to their associated master file
+        slave_names (dict): Dictionary mapping device_id names to their associated master file
             descriptors.
         worker_io (Connection): Worker I/O connection for communicating status updates.
 
@@ -181,25 +184,28 @@ def remove_ports(
                 master_files[master_fd].close()
                 del master_files[master_fd]
                 del slave_names[slave_name]
-                worker_io.send({"status": "OK", "data": slave_name})
+                worker_io.send({"status": "OK", "payload": slave_name})
             # pylint: disable=broad-exception-caught
             except Exception as e:
                 worker_io.send(
                     {
                         "status": "ERROR",
-                        "data": {"error": str(e), "traceback": traceback.format_exc()},
+                        "payload": {
+                            "error": str(e),
+                            "traceback": traceback.format_exc(),
+                        },
                     }
                 )
         else:
-            worker_io.send({"status": "NOT_EXIST", "data": slave_name})
+            worker_io.send({"status": "NOT_EXIST", "payload": slave_name})
 
 
 def forward_data(selector: Selector, master_files: dict, loopback: bool = False):
     """
-    Forward data to all ports of the network.
+    Forward payload to all ports of the network.
 
-    This function forwards data received from one port to all other ports in the virtual network.
-    If loopback is enabled, data is also sent back to the originating port.
+    This function forwards payload received from one port to all other ports in the virtual network.
+    If loopback is enabled, payload is also sent back to the originating port.
 
     Args:
         selector (Selector): Selector instance for event monitoring.
@@ -208,7 +214,7 @@ def forward_data(selector: Selector, master_files: dict, loopback: bool = False)
         loopback (bool, optional): Whether to enable loopback mode. Defaults to False.
 
     Raises:
-        SerialConnectionConfigError: If an error occurs during data forwarding.
+        SerialConnectionConfigError: If an error occurs during payload forwarding.
     """
     for key, events in selector.select(timeout=1):
         key_fd = key.fileobj
@@ -245,7 +251,7 @@ def process_cmd(
         selector (Selector): Selector instance for event monitoring.
         master_files (dict): Dictionary mapping master file descriptors to their corresponding
             objects.
-        slave_names (dict): Dictionary mapping slave names to their associated master file
+        slave_names (dict): Dictionary mapping device_id names to their associated master file
             descriptors.
         worker_io (Connection): Worker I/O connection for communicating status updates.
         openpty_func (Optional[Callable], optional): Function to open pseudo-terminal pairs.
@@ -266,22 +272,22 @@ def process_cmd(
             worker_io.send(
                 {
                     "status": "ERROR",
-                    "data": {"error": str(e), "traceback": traceback.format_exc()},
+                    "payload": {"error": str(e), "traceback": traceback.format_exc()},
                 }
             )
             return True
         if command == "stop":
             return False
         if command == "remove":
-            remove_list = message["data"]
+            remove_list = message["payload"]
             remove_ports(selector, remove_list, master_files, slave_names, worker_io)
         elif command == "add":
-            external_ports = message["data"]
+            external_ports = message["payload"]
             add_external_ports(
                 stack, selector, external_ports, master_files, slave_names, worker_io
             )
         elif command == "create":
-            ports_number = message["data"]
+            ports_number = message["payload"]
             generate_virtual_ports(
                 stack,
                 selector,
@@ -297,7 +303,7 @@ def process_cmd(
 def create_serial_network(
     worker_io: Connection,
     ports_number: int = 2,
-    external_ports: Optional[List[dict]] = None,
+    external_ports: Optional[list[dict]] = None,
     loopback: bool = False,
     openpty_func: Callable = pty.openpty,
 ) -> None:
@@ -310,7 +316,7 @@ def create_serial_network(
     Args:
         worker_io (Connection): Worker I/O connection for communicating status updates.
         ports_number (int, optional): Number of virtual ports to generate. Defaults to 2.
-        external_ports (Optional[List[dict]], optional): List of external serial ports to integrate.
+        external_ports (Optional[list[dict]], optional): List of external serial ports to integrate.
             Defaults to None.
         loopback (bool, optional): Enable loopback mode. Defaults to False.
         openpty_func (Callable, optional): Function to open pseudo-terminal pairs.
@@ -320,7 +326,7 @@ def create_serial_network(
         SerialConnectionConfigError: If an error occurs during network creation.
     """
     # pylint: disable=too-many-locals
-    master_files: dict[int, Union[BinaryIO, Serial]] = {}
+    master_files: dict[int, BinaryIO | Serial] = {}
     slave_names: dict[str, int] = {}
     keep_running: bool = True
     if external_ports is None:

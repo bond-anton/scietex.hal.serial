@@ -131,7 +131,7 @@ async def test_read_registers(
         client,
         start_register=0,
         count=100,
-        slave=1,
+        device_id=1,
         logger=logger_fixture,
     )
     assert reg_data == list(range(1, 101))
@@ -139,7 +139,7 @@ async def test_read_registers(
         client,
         start_register=0,
         count=100,
-        slave=2,
+        device_id=2,
         logger=logger_fixture,
         holding=False,
     )
@@ -150,7 +150,7 @@ async def test_read_registers(
         client,
         start_register=0,
         count=100,
-        slave=1,
+        device_id=1,
         logger=logger_fixture,
     )
     assert reg_data == list(range(1, 101))
@@ -158,7 +158,7 @@ async def test_read_registers(
         client,
         start_register=0,
         count=100,
-        slave=2,
+        device_id=2,
         logger=logger_fixture,
         holding=True,
     )
@@ -170,7 +170,7 @@ async def test_read_registers(
     #     client,
     #     start_register=10,
     #     count=100,
-    #     slave=1,
+    #     device_id=1,
     #     logger=logger_fixture,
     # )
     # assert reg_data == list(range(11, 101))
@@ -181,7 +181,7 @@ async def test_read_registers(
         client,
         start_register=0,
         count=100,
-        slave=1,
+        device_id=1,
         logger=logger_fixture,
     )
     assert reg_data is None
@@ -192,7 +192,7 @@ async def test_read_registers(
         client,
         start_register=0,
         count=100,
-        slave=2,
+        device_id=2,
         logger=logger_fixture,
         holding=False,
     )
@@ -204,7 +204,7 @@ async def test_read_registers(
         client,
         start_register=0,
         count=100,
-        slave=2,
+        device_id=2,
         logger=logger_fixture,
         holding=False,
     )
@@ -217,7 +217,7 @@ async def test_read_registers(
         client,
         start_register=0,
         count=100,
-        slave=1,
+        device_id=1,
         logger=logger_fixture,
         holding=False,
     )
@@ -238,7 +238,7 @@ async def test_write_registers(
         client,
         start_register=0,
         count=100,
-        slave=1,
+        device_id=1,
         logger=logger_fixture,
     )
     assert reg_data == list(range(1, 101))
@@ -247,14 +247,14 @@ async def test_write_registers(
         client,
         register=0,
         value=[7, 8, 9],
-        slave=1,
+        device_id=1,
         logger=logger_fixture,
     )
     reg_data = await modbus_read_holding_registers(
         client,
         start_register=0,
         count=100,
-        slave=1,
+        device_id=1,
         logger=logger_fixture,
     )
     assert reg_data[:4] == [7, 8, 9, 4]
@@ -263,7 +263,7 @@ async def test_write_registers(
         client,
         register=0,
         value=[100, 101],
-        slave=10,
+        device_id=10,
         logger=logger_fixture,
     )
     assert reg_data is None
@@ -283,7 +283,7 @@ async def test_write_register(
         client,
         start_register=0,
         count=1,
-        slave=1,
+        device_id=1,
         logger=logger_fixture,
     )
     assert reg_data == [1]
@@ -292,14 +292,14 @@ async def test_write_register(
         client,
         register=0,
         value=7,
-        slave=1,
+        device_id=1,
         logger=logger_fixture,
     )
     reg_data = await modbus_read_holding_registers(
         client,
         start_register=0,
         count=1,
-        slave=1,
+        device_id=1,
         logger=logger_fixture,
     )
     assert reg_data[0] == 7
@@ -308,7 +308,7 @@ async def test_write_register(
         client,
         register=0,
         value=100,
-        slave=10,
+        device_id=10,
         logger=logger_fixture,
     )
     assert reg_data is None

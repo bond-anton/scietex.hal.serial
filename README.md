@@ -135,11 +135,11 @@ async def main():
 
     client = RS485Client(client_config, address=1, label="My RS485 Device")
     data = await client.read_registers(0, count=10)
-    print(f"Registers data: {data}")
+    print(f"Registers payload: {data}")
     
     await client.write_register_float(register=0, value=3.14159, factor=100)
     data = await client.read_registers(0, count=10)
-    print(f"Registers data: {data}")
+    print(f"Registers payload: {data}")
 
     value = await client.read_register_float(register=0, factor=100)
     print(f"Read value: {value}")

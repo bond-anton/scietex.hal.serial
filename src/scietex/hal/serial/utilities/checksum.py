@@ -7,31 +7,31 @@ checksums and Longitudinal Redundancy Check (LRC).
 
 Functions:
     - check_sum(payload: bytes) -> int:
-        Computes the CRC-16/Modbus checksum for the given payload data.
+        Computes the CRC-16/Modbus checksum for the given payload payload.
     - lrc(payload: bytes) -> int:
-        Calculates the Longitudinal Redundancy Check (LRC) for the given payload data.
+        Calculates the Longitudinal Redundancy Check (LRC) for the given payload payload.
     - check_lrc(message: bytes) -> bool:
         Verifies the correctness of the LRC byte at the end of the message.
 
-Checksum algorithms play a critical role in ensuring data integrity during serial communications.
+Checksum algorithms play a critical role in ensuring payload integrity during serial communications.
 CRC-16/Modbus is widely used in industrial protocols like Modbus RTU, while LRC is simpler
 but still effective.
 
 This module ensures that checksum calculations adhere to established standards, improving
-reliability of serial data transfers.
+reliability of serial payload transfers.
 """
 
 
 def check_sum(payload: bytes) -> int:
     """
-    Calculate CRC-16/MODBUS checksum for the payload data.
+    Calculate CRC-16/MODBUS checksum for the payload payload.
 
     This function computes the CRC-16/Modbus checksum according to the standard algorithm used in
     many industrial communication protocols. The polynomial used is 0xA001, which is typical for
     CRC-16/Modbus.
 
     Args:
-        payload (bytes): Payload data for which the checksum needs to be calculated.
+        payload (bytes): Payload payload for which the checksum needs to be calculated.
 
     Returns:
         int: The computed CRC-16/Modbus checksum.
@@ -60,13 +60,13 @@ def check_sum(payload: bytes) -> int:
 
 def lrc(payload: bytes) -> int:
     """
-    Calculate LRC (Longitudinal Redundancy Check) for the payload data.
+    Calculate LRC (Longitudinal Redundancy Check) for the payload payload.
 
     LRC is a simple yet effective checksum mechanism often used in serial communication protocols.
     It calculates the sum of all bytes modulo 256 and then inverts the result.
 
     Args:
-        payload (bytes): Payload data for which the LRC needs to be calculated.
+        payload (bytes): Payload payload for which the LRC needs to be calculated.
 
     Returns:
         int: The computed LRC value.

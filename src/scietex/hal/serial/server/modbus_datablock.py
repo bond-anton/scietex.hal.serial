@@ -1,9 +1,10 @@
 """
 Custom reactive DataBlock for Modbus server.
 
-This module defines a custom reactive sequential data block for use in a Modbus server. The primary
-goal is to provide enhanced functionality, such as triggering callbacks whenever register values
-are changed. This allows for better monitoring and reaction to changes in the server’s state.
+This module defines a custom reactive sequential payload block for use in a Modbus server.
+The primary goal is to provide enhanced functionality, such as triggering callbacks whenever
+register values are changed. This allows for better monitoring and reaction to changes
+in the server’s state.
 
 Dependencies:
     - pymodbus: Provides base classes and utilities for building Modbus servers and clients.
@@ -18,7 +19,7 @@ Methods:
     - on_change(self, address, values): Callback invoked when register values are changed. Can be
       overridden to perform custom actions, such as logging or event triggering.
 
-This custom data block enhances the capabilities of the Modbus server by providing flexibility
+This custom payload block enhances the capabilities of the Modbus server by providing flexibility
 to react to changes in register values dynamically.
 """
 

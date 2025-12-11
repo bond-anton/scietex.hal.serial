@@ -18,7 +18,7 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "pymodbus[serial] == 3.9.2"
+    "pymodbus[serial] >= 3.11.4"
 ]
 
 [project.urls]
@@ -40,7 +40,7 @@ version = {attr = "scietex.hal.serial.version.__version__"}
 where = ["src"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 
 [tool.pytest.ini_options]
 pythonpath = [

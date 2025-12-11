@@ -9,7 +9,7 @@ used throughout the application.
 Functions:
     - validate_port(port): Validates the serial port name.
     - validate_baudrate(baudrate): Validates the baud rate.
-    - validate_bytesize(bytesize): Validates the number of data bits.
+    - validate_bytesize(bytesize): Validates the number of payload bits.
     - validate_parity(parity): Validates the parity setting.
     - validate_stopbits(stopbits): Validates the number of stop bits.
     - validate_timeout(timeout): Validates the timeout value.
@@ -31,7 +31,7 @@ By centralizing validation logic here, we ensure consistent enforcement of const
 configurations.
 """
 
-from typing import Union
+from typing import Optional
 
 from .exceptions import SerialConnectionConfigError
 from .defaults import (
@@ -49,7 +49,7 @@ from .defaults import (
 )
 
 
-def validate_port(port: Union[str, None]) -> str:
+def validate_port(port: Optional[str]) -> str:
     """
     Validate the port value.
 
@@ -73,7 +73,7 @@ def validate_port(port: Union[str, None]) -> str:
     return port
 
 
-def validate_baudrate(baudrate: Union[int, None]) -> int:
+def validate_baudrate(baudrate: Optional[int]) -> int:
     """
     Validate the baudrate value.
 
@@ -97,15 +97,15 @@ def validate_baudrate(baudrate: Union[int, None]) -> int:
     return baudrate
 
 
-def validate_bytesize(bytesize: Union[int, None]) -> int:
+def validate_bytesize(bytesize: Optional[int]) -> int:
     """
     Validate the bytesize value.
 
-    Ensures that the number of data bits is an integer and falls within the predefined list of
+    Ensures that the number of payload bits is an integer and falls within the predefined list of
     supported values.
 
     Args:
-        bytesize (int): Number of data bits to validate.
+        bytesize (int): Number of payload bits to validate.
 
     Returns:
         int: Validated bytesize.
@@ -121,7 +121,7 @@ def validate_bytesize(bytesize: Union[int, None]) -> int:
     return bytesize
 
 
-def validate_parity(parity: Union[str, None]) -> str:
+def validate_parity(parity: Optional[str]) -> str:
     """
     Validate the parity value.
 
@@ -144,7 +144,7 @@ def validate_parity(parity: Union[str, None]) -> str:
     return parity
 
 
-def validate_stopbits(stopbits: Union[int, None]) -> int:
+def validate_stopbits(stopbits: Optional[int]) -> int:
     """
     Validate the stopbits value.
 
@@ -167,17 +167,17 @@ def validate_stopbits(stopbits: Union[int, None]) -> int:
     return stopbits
 
 
-def validate_timeout(timeout: Union[float, None]) -> Union[float, None]:
+def validate_timeout(timeout: Optional[float]) -> Optional[float]:
     """
     Validate the timeout value.
 
     Ensures that the timeout is a non-negative float or None.
 
     Args:
-        timeout (Union[float, None]): Timeout value to validate.
+        timeout (Optional[float]): Timeout value to validate.
 
     Returns:
-        Union[float, None]: Validated timeout.
+        Optional[float]: Validated timeout.
     """
     if timeout is None:
         return DEFAULT_TIMEOUT
@@ -190,7 +190,7 @@ def validate_timeout(timeout: Union[float, None]) -> Union[float, None]:
     return float(timeout)
 
 
-def validate_framer(framer: Union[str, None]) -> str:
+def validate_framer(framer: Optional[str]) -> str:
     """
     Validate the framer value.
 

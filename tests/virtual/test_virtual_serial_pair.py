@@ -71,7 +71,7 @@ def test_start_stop(logger_fixture):  # pylint: disable=redefined-outer-name
 
 
 def test_communication(logger_fixture):  # pylint: disable=redefined-outer-name
-    """Test that data can be sent and received between the virtual serial ports."""
+    """Test that payload can be sent and received between the virtual serial ports."""
     vsp = VirtualSerialPair(logger=logger_fixture)
     vsp.start()
 
@@ -80,11 +80,11 @@ def test_communication(logger_fixture):  # pylint: disable=redefined-outer-name
         with open(vsp.serial_ports[0], "wb", buffering=0) as port1:
             # Open the second serial port for reading
             with open(vsp.serial_ports[1], "rb", buffering=0) as port2:
-                # Send data from port1
+                # Send payload from port1
                 test_data = b"Hello, World!"
                 port1.write(test_data)
 
-                # Read data from port2
+                # Read payload from port2
                 received_data = port2.read(len(test_data))
                 assert received_data == test_data
     finally:

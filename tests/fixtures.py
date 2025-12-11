@@ -2,7 +2,7 @@
 
 from logging import getLogger
 
-from pymodbus.datastore import ModbusSlaveContext
+from pymodbus.datastore import ModbusDeviceContext
 
 import pytest
 
@@ -44,7 +44,7 @@ def store_fixture():
     block = ReactiveSequentialDataBlock(0x01, list(range(1, 101)))
     di_block = ReactiveSequentialDataBlock(0x01, list([1] * 100))
     co_block = ReactiveSequentialDataBlock(0x01, list([0] * 100))
-    store = ModbusSlaveContext(di=di_block, co=co_block, hr=block, ir=block)
+    store = ModbusDeviceContext(di=di_block, co=co_block, hr=block, ir=block)
     return store
 
 
@@ -96,6 +96,6 @@ def client_config(vsp_fixture):
 def rs485_srv(logger_fixture, server_config, single_slave_fixture):
     """RS485 Server."""
     server = RS485Server(
-        server_config, slaves=single_slave_fixture, logger=logger_fixture
+        server_config, devices=single_slave_fixture, logger=logger_fixture
     )
     return server

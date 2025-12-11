@@ -12,16 +12,16 @@ Classes:
 Functions:
     - _ext_ports_remove_duplicates(self): Removes duplicate entries from the list of external
       ports.
-    - _update_ext_ports(self, ports_connected: List[str]): Updates the list of external ports after
+    - _update_ext_ports(self, ports_connected: list[str]): Updates the list of external ports after
       successful connection attempts.
 
 Attributes:
     - virtual_ports_num (int): The number of virtual ports currently active in the network.
-    - external_ports (List[SerialConnectionMinimalConfig]): List of external serial ports
+    - external_ports (list[SerialConnectionMinimalConfig]): List of external serial ports
       configured for integration into the virtual network.
-    - serial_ports (List[str]): Combined list of all active ports (both virtual and external) in
+    - serial_ports (list[str]): Combined list of all active ports (both virtual and external) in
       the network.
-    - loopback (bool): Flag indicating whether loopback mode is enabled. In this mode, data sent
+    - loopback (bool): Flag indicating whether loopback mode is enabled. In this mode, payload sent
       from a port is also received by itself.
     - logger (logging.Logger): Logging handler for recording debug, info, warning, and error
       messages.
@@ -30,7 +30,7 @@ This class encapsulates the complexity of managing multiple serial ports, allowi
 on higher-level tasks such as simulating device behavior or integrating external hardware.
 """
 
-from typing import Union, List, Optional, Callable
+from typing import Optional, Callable
 from multiprocessing import Pipe, Process
 from multiprocessing.connection import Connection
 from logging import Logger, getLogger
@@ -51,11 +51,11 @@ class VirtualSerialNetwork:
     Attributes:
         virtual_ports_num (int): The number of virtual ports initially requested when the network
             starts.
-        external_ports (List[SerialConnectionMinimalConfig]): A list of external serial ports that
+        external_ports (list[SerialConnectionMinimalConfig]): A list of external serial ports that
             can be integrated into the virtual network.
-        serial_ports (List[str]): A combined list of all active ports (both virtual and external)
+        serial_ports (list[str]): A combined list of all active ports (both virtual and external)
             in the network.
-        loopback (bool): Determines whether loopback mode is enabled. In loopback mode, data sent
+        loopback (bool): Determines whether loopback mode is enabled. In loopback mode, payload sent
             from a port is also received by itself.
         logger (Logger): A logging handler for recording debug, info, warning, and error messages
             related to the virtual network's operation.
@@ -64,16 +64,16 @@ class VirtualSerialNetwork:
         start(self, openpty_func=None): Starts the virtual serial network and initializes
             communication.
         stop(self): Stops the virtual serial network and cleans up resources.
-        add(self, external_ports: List[SerialConnectionMinimalConfig]): Adds external serial ports
+        add(self, external_ports: list[SerialConnectionMinimalConfig]): Adds external serial ports
             to the network.
         create(self, ports_num: int): Creates additional virtual ports in the network.
-        remove(self, remove_list: List[str]): Removes specified ports from the network.
+        remove(self, remove_list: list[str]): Removes specified ports from the network.
     """
 
     def __init__(
         self,
         virtual_ports_num: int = 2,
-        external_ports: Optional[List[SerialConnectionMinimalConfig]] = None,
+        external_ports: Optional[list[SerialConnectionMinimalConfig]] = None,
         loopback: bool = False,
         logger: Optional[Logger] = None,
     ) -> None:
@@ -83,23 +83,23 @@ class VirtualSerialNetwork:
         Args:
             virtual_ports_num (int, optional): The initial number of virtual ports to create.
                 Defaults to 2.
-            external_ports (Optional[List[SerialConnectionMinimalConfig]], optional): A list
+            external_ports (Optional[list[SerialConnectionMinimalConfig]], optional): A list
                 of external serial ports to integrate into the virtual network. Defaults to None.
-            loopback (bool, optional): Enables loopback mode where data sent from a port is also
+            loopback (bool, optional): Enables loopback mode where payload sent from a port is also
                 received by itself. Defaults to False.
             logger (Optional[Logger], optional): A logging handler for recording operational
                 information. Defaults to a basic logger if none is provided.
         """
         self.__master_io: Optional[Connection] = None
         self.__worker_io: Optional[Connection] = None
-        self.__p: Union[Process, None] = None
+        self.__p: Process | None = None
         self.loopback: bool = loopback
-        self.external_ports: List[SerialConnectionMinimalConfig] = (
+        self.external_ports: list[SerialConnectionMinimalConfig] = (
             external_ports if external_ports is not None else []
         )
         self._ext_ports_remove_duplicates()
         self.virtual_ports_num: int = virtual_ports_num
-        self.serial_ports: List[str] = []
+        self.serial_ports: list[str] = []
 
         self.logger: Logger = logger if isinstance(logger, Logger) else getLogger()
 
@@ -109,7 +109,7 @@ class VirtualSerialNetwork:
 
         This method initiates the virtual network by spawning a separate process (`worker`)
         responsible for managing the ports. Once started, the network begins listening for commands
-        and data.
+        and payload.
 
         Args:
             openpty_func (Optional[Callable], optional): An alternative function for opening
@@ -141,17 +141,17 @@ class VirtualSerialNetwork:
         for _ in range(virtual_ports_num):
             response = self.__master_io.recv()
             if response["status"] == "ERROR":
-                self.logger.error("VSN: ERROR (%s)", response["data"]["error"])
+                self.logger.error("VSN: ERROR (%s)", response["payload"]["error"])
             elif response["status"] == "OK":
-                self.serial_ports.append(response["data"])
+                self.serial_ports.append(response["payload"])
                 self.virtual_ports_num += 1
         ports_connected = []
         for _ in range(len(self.external_ports)):
             response = self.__master_io.recv()
             if response["status"] == "ERROR":
-                self.logger.error("VSN: ERROR (%s)", response["data"]["error"])
+                self.logger.error("VSN: ERROR (%s)", response["payload"]["error"])
             elif response["status"] == "OK":
-                ports_connected.append(response["data"])
+                ports_connected.append(response["payload"])
         self._update_ext_ports(ports_connected)
         self._ext_ports_remove_duplicates()
         self.serial_ports += ports_connected
@@ -176,14 +176,14 @@ class VirtualSerialNetwork:
                 new_external_ports_list.append(port_params)
         self.external_ports = new_external_ports_list
 
-    def _update_ext_ports(self, ports_connected: List[str]):
+    def _update_ext_ports(self, ports_connected: list[str]):
         """
         Updates the list of external ports after successful connection attempts.
 
         Only those external ports that were successfully connected remain in the updated list.
 
         Args:
-            ports_connected (List[str]): List of successfully connected external ports.
+            ports_connected (list[str]): List of successfully connected external ports.
         """
         new_external_ports_list = []
         for port_params in self.external_ports:
@@ -210,7 +210,7 @@ class VirtualSerialNetwork:
             self.serial_ports = []
             self.logger.info("VSN: STOPPED")
 
-    def add(self, external_ports: List[SerialConnectionMinimalConfig]):
+    def add(self, external_ports: list[SerialConnectionMinimalConfig]):
         """
         Add external ports to the network.
 
@@ -218,24 +218,26 @@ class VirtualSerialNetwork:
         Successfully connected ports are appended to the internal lists.
 
         Args:
-            external_ports (List[SerialConnectionMinimalConfig]): List of external serial ports
+            external_ports (list[SerialConnectionMinimalConfig]): List of external serial ports
                 to add.
         """
         if self.__master_io is not None:
             ext_ports = [
                 con_params.to_dict() for con_params in list(set(external_ports))
             ]
-            self.__master_io.send({"cmd": "add", "data": ext_ports})
+            self.__master_io.send({"cmd": "add", "payload": ext_ports})
             ports_connected = []
             for _ in range(len(ext_ports)):
                 response = self.__master_io.recv()
                 if response["status"] == "ERROR":
-                    self.logger.error("VSN: ERROR (%s)", response["data"]["error"])
+                    self.logger.error("VSN: ERROR (%s)", response["payload"]["error"])
                 elif response["status"] == "EXIST":
-                    self.logger.error("VSN: Port (%s) already added.", response["data"])
+                    self.logger.error(
+                        "VSN: Port (%s) already added.", response["payload"]
+                    )
                 elif response["status"] == "OK":
                     for port in list(set(external_ports)):
-                        if port.port == response["data"]:
+                        if port.port == response["payload"]:
                             ports_connected.append(port)
                             break
             self.external_ports += ports_connected
@@ -254,16 +256,16 @@ class VirtualSerialNetwork:
             ports_num (int): Number of new virtual ports to create.
         """
         if self.__master_io is not None:
-            self.__master_io.send({"cmd": "create", "data": ports_num})
+            self.__master_io.send({"cmd": "create", "payload": ports_num})
             for _ in range(ports_num):
                 response = self.__master_io.recv()
                 if response["status"] == "ERROR":
-                    self.logger.error("VSN: ERROR (%s)", response["data"]["error"])
+                    self.logger.error("VSN: ERROR (%s)", response["payload"]["error"])
                 elif response["status"] == "OK":
-                    self.serial_ports.append(response["data"])
+                    self.serial_ports.append(response["payload"])
                     self.virtual_ports_num += 1
 
-    def remove(self, remove_list: List[str]):
+    def remove(self, remove_list: list[str]):
         """
         Remove port from the network.
 
@@ -271,19 +273,19 @@ class VirtualSerialNetwork:
         from the virtual network.
 
         Args:
-            remove_list (List[str]): List of ports to remove from the network.
+            remove_list (list[str]): List of ports to remove from the network.
         """
         if self.__master_io is not None:
-            self.__master_io.send({"cmd": "remove", "data": remove_list})
+            self.__master_io.send({"cmd": "remove", "payload": remove_list})
             removed_ports = []
             for _ in range(len(remove_list)):
                 response = self.__master_io.recv()
                 if response["status"] == "ERROR":
-                    self.logger.error("VSN: ERROR (%s)", response["data"]["error"])
+                    self.logger.error("VSN: ERROR (%s)", response["payload"]["error"])
                 if response["status"] == "NOT_EXIST":
-                    self.logger.warning("VSN: Port %s not found", response["data"])
+                    self.logger.warning("VSN: Port %s not found", response["payload"])
                 elif response["status"] == "OK":
-                    removed_ports.append(response["data"])
+                    removed_ports.append(response["payload"])
             for port in removed_ports:
                 found = False
                 for i, ext_port in enumerate(self.external_ports):

@@ -14,7 +14,7 @@ This module simplifies interaction with Modbus devices over RS485, making it eas
 with industrial automation systems and IoT applications.
 """
 
-from typing import Union, Optional, Any
+from typing import Optional, Any
 from logging import Logger, getLogger
 
 from pymodbus.pdu import ModbusPDU, DecodePDU
@@ -57,10 +57,10 @@ class RS485Client:
     registers, as well as custom framers, decoders, and response handlers.
 
     Args:
-        con_params (Union[SerialConnectionConfigModel, ModbusSerialConnectionConfigModel]):
+        con_params (SerialConnectionConfigModel | ModbusSerialConnectionConfigModel):
             Configuration parameters for the serial connection.
         address (int, optional):
-            The slave address of the Modbus device. Defaults to 1.
+            The device_id address of the Modbus device. Defaults to 1.
         label (str, optional):
             A label for the client, used for logging and identification. Defaults to "RS485 Device".
         custom_framer (Optional[type[FramerBase]], optional):
@@ -75,12 +75,12 @@ class RS485Client:
             is used.
 
     Attributes:
-        _con_params (Union[SerialConnectionConfigModel, ModbusSerialConnectionConfigModel]):
+        _con_params (SerialConnectionConfigModel | ModbusSerialConnectionConfigModel):
             Configuration parameters for the serial connection.
         client (AsyncModbusSerialClient):
             The Modbus client instance used for communication.
         address (int):
-            The slave address of the Modbus device.
+            The device_id address of the Modbus device.
         _label (str):
             A label for the client, used for logging and identification.
         logger (Logger):
@@ -90,9 +90,7 @@ class RS485Client:
     # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-instance-attributes
     def __init__(
         self,
-        con_params: Union[
-            SerialConnectionConfigModel, ModbusSerialConnectionConfigModel
-        ],
+        con_params: SerialConnectionConfigModel | ModbusSerialConnectionConfigModel,
         address: int = 1,
         label: str = "RS485 Device",
         custom_framer: Optional[type[FramerBase]] = None,
@@ -100,9 +98,9 @@ class RS485Client:
         custom_response: Optional[list[type[ModbusPDU]]] = None,
         logger: Optional[Logger] = None,
     ):
-        self._con_params: Union[
-            SerialConnectionConfigModel, ModbusSerialConnectionConfigModel
-        ] = con_params
+        self._con_params: (
+            SerialConnectionConfigModel | ModbusSerialConnectionConfigModel
+        ) = con_params
         self._custom_framer = custom_framer
         self._custom_decoder = custom_decoder
         self._custom_response = custom_response
@@ -126,14 +124,14 @@ class RS485Client:
     @property
     def con_params(
         self,
-    ) -> Union[SerialConnectionConfigModel, ModbusSerialConnectionConfigModel]:
+    ) -> SerialConnectionConfigModel | ModbusSerialConnectionConfigModel:
         """Connection parameters"""
         return self._con_params
 
     @con_params.setter
     def con_params(
         self,
-        params: Union[SerialConnectionConfigModel, ModbusSerialConnectionConfigModel],
+        params: SerialConnectionConfigModel | ModbusSerialConnectionConfigModel,
     ) -> None:
         self._con_params = params
         self.client.close()
@@ -191,7 +189,7 @@ class RS485Client:
         signed: bool = False,
     ) -> Optional[list[int]]:
         """
-        Read data from Modbus registers.
+        Read payload from Modbus registers.
 
         Args:
             start_register (int, optional):
@@ -205,7 +203,7 @@ class RS485Client:
                 If True, interprets the register value as a signed integer. Defaults to False.
 
         Returns:
-            Union[list[int], None]:
+            list[int] | None:
                 A list of register values if the read operation is successful. Returns None if an
                 error occurs or the response is invalid.
         """
@@ -213,7 +211,7 @@ class RS485Client:
             self.client,
             start_register=start_register,
             count=count,
-            slave=self.address,
+            device_id=self.address,
             holding=holding,
             logger=self.logger,
         )
@@ -228,7 +226,7 @@ class RS485Client:
         self, register: int, holding: bool = True, signed: bool = False
     ) -> Optional[int]:
         """
-        Read data from a single Modbus register.
+        Read payload from a single Modbus register.
 
         Args:
             register (int):
@@ -261,7 +259,7 @@ class RS485Client:
         no_response_expected: bool = False,
     ) -> Optional[list[int]]:
         """
-        Write data to a single Modbus register.
+        Write payload to a single Modbus register.
 
         Args:
             start_register (int):
@@ -271,7 +269,7 @@ class RS485Client:
             signed (bool, optional):
                 If True, interprets the value as a signed integer. Defaults to False.
             no_response_expected (bool):
-                If True, do not wait for the slave response. Defaults to False.
+                If True, do not wait for the device_id response. Defaults to False.
 
         Returns:
             Optional[int]:
@@ -287,7 +285,7 @@ class RS485Client:
             self.client,
             register=start_register,
             value=_values,
-            slave=self.address,
+            device_id=self.address,
             logger=self.logger,
             no_response_expected=no_response_expected,
         )
@@ -310,7 +308,7 @@ class RS485Client:
         no_response_expected: bool = False,
     ) -> Optional[int]:
         """
-        Write data to a single Modbus register.
+        Write payload to a single Modbus register.
 
         Args:
             register (int):
@@ -320,7 +318,7 @@ class RS485Client:
             signed (bool, optional):
                 If True, interprets the value as a signed integer. Defaults to False.
             no_response_expected (bool):
-                If True, do not wait for the slave response. Defaults to False.
+                If True, do not wait for the device_id response. Defaults to False.
 
         Returns:
             Optional[int]:
@@ -336,7 +334,7 @@ class RS485Client:
             self.client,
             register=register,
             value=_v,
-            slave=self.address,
+            device_id=self.address,
             logger=self.logger,
             no_response_expected=no_response_expected,
         )
@@ -405,7 +403,7 @@ class RS485Client:
             signed (bool, optional):
                 If True, interprets the value as a signed integer. Defaults to False.
             no_response_expected (bool):
-                If True, do not wait for the slave response. Defaults to False.
+                If True, do not wait for the device_id response. Defaults to False.
 
         Returns:
             Optional[float]:
@@ -468,7 +466,7 @@ class RS485Client:
     async def read_two_registers_float(
         self,
         start_register: int,
-        factor: Union[int, float] = 100,
+        factor: int | float = 100,
         holding: bool = True,
         byteorder: ByteOrder = ByteOrder.LITTLE_ENDIAN,
         signed: bool = False,
@@ -482,7 +480,7 @@ class RS485Client:
         Args:
             start_register (int):
                 The starting address of the registers to read.
-            factor (Union[int, float], optional):
+            factor (int | float, optional):
                 The divisor used to scale the integer value into a float. Must not be zero.
                 Defaults to 100.
             holding (bool, optional):
@@ -533,7 +531,7 @@ class RS485Client:
             signed (bool, optional):
                 If True, interprets the value as a signed integer. Defaults to False.
             no_response_expected (bool):
-                If True, do not wait for the slave response. Defaults to False.
+                If True, do not wait for the device_id response. Defaults to False.
 
         Returns:
             Optional[int]:
@@ -549,7 +547,7 @@ class RS485Client:
             self.client,
             register=start_register,
             value=[value_a, value_b],
-            slave=self.address,
+            device_id=self.address,
             logger=self.logger,
             no_response_expected=no_response_expected,
         )
@@ -571,7 +569,7 @@ class RS485Client:
         self,
         start_register: int,
         value: float,
-        factor: Union[int, float] = 100,
+        factor: int | float = 100,
         byteorder: ByteOrder = ByteOrder.LITTLE_ENDIAN,
         signed: bool = False,
         no_response_expected: bool = False,
@@ -586,7 +584,7 @@ class RS485Client:
                 The starting address of the registers to write to.
             value (float):
                 The float value to write.
-            factor (Union[int, float], optional):
+            factor (int | float, optional):
                 The multiplier used to scale the float value into an integer. Must not be zero.
                 Defaults to 100.
             byteorder (ByteOrder, optional):
@@ -595,7 +593,7 @@ class RS485Client:
             signed (bool, optional):
                 If True, interprets the value as a signed integer. Defaults to False.
             no_response_expected (bool):
-                If True, do not wait for the slave response. Defaults to False.
+                If True, do not wait for the device_id response. Defaults to False.
 
         Returns:
             Optional[float]:
@@ -623,17 +621,17 @@ class RS485Client:
             start_register, factor, signed=signed
         )
 
-    async def read_data(self) -> dict[str, Union[int, float, list[Union[int, float]]]]:
+    async def read_data(self) -> dict[str, int | float | list[int | float]]:
         """
-        Read data from the device and return it as a dictionary.
+        Read payload from the device and return it as a dictionary.
 
-        This method is intended to be overridden in subclasses to provide device-specific data.
+        This method is intended to be overridden in subclasses to provide device-specific payload.
 
         Returns:
-            dict[str, Union[int, float, list[Union[int, float]]]:
-                A dictionary containing the data read from the device.
+            dict[str, int | float | list[int | float]]:
+                A dictionary containing the payload read from the device.
         """
-        self.logger.debug("Read data request.")
+        self.logger.debug("Read payload request.")
         return {}
 
     async def process_message(self, message: dict[str, Any]):

@@ -1,7 +1,7 @@
 """
 RS485 Modbus Serial Server.
 
-This module implements an RS485 Modbus server capable of managing multiple slave contexts and
+This module implements an RS485 Modbus server capable of managing multiple device_id contexts and
 responding to Modbus requests. It leverages the `pymodbus` library for serial communication and
 server management.
 
@@ -14,27 +14,27 @@ Classes:
 
 Methods:
     - start(self): Starts the server and listens for incoming Modbus requests.
-    - update_slave(self, slave_id, store): Adds or updates a slave context in the server.
-    - remove_slave(self, slave_id): Removes a slave context from the server.
+    - update_slave(self, slave_id, store): Adds or updates a device_id context in the server.
+    - remove_slave(self, slave_id): Removes a device_id context from the server.
     - stop(self): Stops the server and shuts down all connections.
     - restart(self): Restarts the server after stopping it.
 
-This server is designed to handle multiple Modbus slaves efficiently, making it suitable for
+This server is designed to handle multiple Modbus devices efficiently, making it suitable for
 industrial automation and IoT applications that require scalable and reliable communication
 over RS485 interfaces.
 """
 
-from typing import Union, Optional
+from typing import Optional
 import asyncio
 from logging import Logger, getLogger
 
 from pymodbus.datastore import (
     ModbusServerContext,
-    ModbusSlaveContext,
+    ModbusDeviceContext,
 )
 from pymodbus.pdu import ModbusPDU, DecodePDU
 from pymodbus.framer import FramerBase
-from pymodbus.device import ModbusDeviceIdentification
+from pymodbus.pdu.device import ModbusDeviceIdentification
 from pymodbus.server import ModbusSerialServer
 
 from ..version import __version__ as version
@@ -61,23 +61,23 @@ class RS485Server:
     """
     RS485 Modbus Serial Server.
 
-    This class implements an RS485 Modbus server that can handle multiple slave contexts and
+    This class implements an RS485 Modbus server that can handle multiple device_id contexts and
     respond to Modbus requests. It uses the `pymodbus` library for serial communication and
     server management.
 
     Attributes:
-        slaves (dict): Mapping of slave IDs to their respective ModbusSlaveContext objects.
-        context (ModbusServerContext): Server context containing all registered slave contexts.
+        devices (dict): Mapping of device_id IDs to their respective ModbusDeviceContext objects.
+        context (ModbusServerContext): Server context containing all registered device_id contexts.
         identity (ModbusDeviceIdentification): Identification information for the server.
-        con_params (Union[SerialConnectionConfigModel, ModbusSerialConnectionConfigModel]):
+        con_params (SerialConnectionConfigModel | ModbusSerialConnectionConfigModel):
             Connection parameters for the server.
         logger (Logger): Logging handler for recording operational information.
         server (Optional[ModbusSerialServer]): Underlying ModbusSerialServer instance.
 
     Methods:
         - start(self): Starts the server and begins listening for incoming Modbus requests.
-        - update_slave(self, slave_id, store): Adds or updates a slave context in the server.
-        - remove_slave(self, slave_id): Removes a slave context from the server.
+        - update_slave(self, slave_id, store): Adds or updates a device_id context in the server.
+        - remove_slave(self, slave_id): Removes a device_id context from the server.
         - stop(self): Stops the server and shuts down all connections.
         - restart(self): Restarts the server after stopping it.
     """
@@ -85,10 +85,8 @@ class RS485Server:
     # pylint: disable=too-many-arguments,too-many-positional-arguments
     def __init__(
         self,
-        con_params: Union[
-            SerialConnectionConfigModel, ModbusSerialConnectionConfigModel
-        ],
-        slaves: Optional[dict[int, ModbusSlaveContext]] = None,
+        con_params: SerialConnectionConfigModel | ModbusSerialConnectionConfigModel,
+        devices: Optional[dict[int, ModbusDeviceContext]] = None,
         custom_pdu: Optional[list[type[ModbusPDU]]] = None,
         custom_framer: Optional[type[FramerBase]] = None,
         custom_decoder: Optional[type[DecodePDU]] = None,
@@ -98,45 +96,46 @@ class RS485Server:
         Initialize the RS485Server instance.
 
         Args:
-            con_params (Union[SerialConnectionConfigModel, ModbusSerialConnectionConfigModel]):
+            con_params (SerialConnectionConfigModel | ModbusSerialConnectionConfigModel):
                 Connection parameters for the server, such as port, baudrate, etc.
-            slaves (Optional[Dict[int, ModbusSlaveContext]], optional): Mapping of slave IDs to
-                their respective ModbusSlaveContext objects. Defaults to a single slave with
-                predefined values.
+            devices (Optional[Dict[int, ModbusDeviceContext]], optional): Mapping of device_id IDs
+                to their respective ModbusDeviceContext objects. Defaults to a single device_id
+                with predefined values.
             custom_pdu (list[type[ModbusPDU]]): Custom modbus protocol PDU list.
             custom_framer(type[FramerBase], optional): Custom protocol framer.
-            custom_decoder (type[DecodePDU], optional): Custom PDU decoder for non-standard framers.
+            custom_decoder (type[DecodePDU], optional): Custom PDU decoder for non-standard
+                framers.
             logger (Optional[Logger], optional): Logging handler for recording operational
                 information. Defaults to a basic logger if none is provided.
         """
-        self.slaves: dict[int, ModbusSlaveContext] = {}
+        self.devices: dict[int, ModbusDeviceContext] = {}
         self.custom_pdu: Optional[list[type[ModbusPDU]]] = custom_pdu
         self.custom_framer: Optional[type[FramerBase]] = custom_framer
         self.custom_decoder: Optional[type[DecodePDU]] = custom_decoder
-        if slaves is not None:
-            if not isinstance(slaves, dict):
+        if devices is not None:
+            if not isinstance(devices, dict):
                 raise TypeError(
-                    "The 'slaves' argument must be a dict mapping integers to ModbusSlaveContext."
+                    "The 'devices' argument must be a dict mapping integers to ModbusDeviceContext."
                 )
-            for addr, store in slaves.items():
+            for addr, store in devices.items():
                 if (
-                    isinstance(store, ModbusSlaveContext)
+                    isinstance(store, ModbusDeviceContext)
                     and isinstance(addr, int)
                     and 0 < addr < 248
                 ):
-                    self.slaves[addr] = store
+                    self.devices[addr] = store
         else:
             block = ReactiveSequentialDataBlock(0x01, [17] * 100)
-            store = ModbusSlaveContext(di=block, co=block, hr=block, ir=block)
-            self.slaves = {0x01: store}
+            store = ModbusDeviceContext(di=block, co=block, hr=block, ir=block)
+            self.devices = {0x01: store}
 
-        self.context = ModbusServerContext(slaves=self.slaves, single=False)
+        self.context = ModbusServerContext(devices=self.devices, single=False)
         self.identity = ModbusDeviceIdentification(info_name=SERVER_INFO)
-        self.con_params: Union[
-            SerialConnectionConfigModel, ModbusSerialConnectionConfigModel
-        ] = con_params
+        self.con_params: (
+            SerialConnectionConfigModel | ModbusSerialConnectionConfigModel
+        ) = con_params
         self.logger: Logger = logger if isinstance(logger, Logger) else getLogger()
-        self._task: Union[asyncio.Task, None] = None
+        self._task: Optional[asyncio.Task] = None
         self.server: Optional[ModbusSerialServer] = None
 
     async def start(self):
@@ -167,50 +166,53 @@ class RS485Server:
             self._task = asyncio.create_task(self.server.serve_forever())
             self.logger.info("Server started")
 
-    async def update_slave(self, slave_id: int, store: ModbusSlaveContext):
+    async def update_slave(self, slave_id: int, store: ModbusDeviceContext):
         """
-        Add or update a slave context in the server.
+        Add or update a device_id context in the server.
 
-        This method adds or updates a Modbus slave context in the server's context. It is useful
+        This method adds or updates a Modbus device_id context in the server's context. It is useful
         for dynamically changing the server's behavior without restarting the entire server.
 
         Args:
-            slave_id (int): Unique identifier for the slave being updated or added.
-            store (ModbusSlaveContext): ModbusSlaveContext object representing the slave's data.
+            slave_id (int): Unique identifier for the device_id being updated or added.
+            store (ModbusDeviceContext): ModbusDeviceContext object.
 
         Raises:
-            ValueError: If the slave ID is invalid or out of range.
+            ValueError: If the device_id ID is invalid or out of range.
 
         Notes:
             - The server context is updated dynamically, allowing immediate changes to take effect.
         """
         if not isinstance(slave_id, int) or not 0 < slave_id < 248:
-            raise ValueError("Invalid slave ID. Must be an integer between 1 and 247.")
-        self.slaves[slave_id] = store
-        self.context = ModbusServerContext(slaves=self.slaves, single=False)
+            raise ValueError(
+                "Invalid device_id ID. Must be an integer between 1 and 247."
+            )
+        self.devices[slave_id] = store
+        self.context = ModbusServerContext(devices=self.devices, single=False)
         self.logger.info("Slave with ID %s added/updated successfully.", slave_id)
         if self._task is not None:
             await self.restart()
 
     async def remove_slave(self, slave_id: int):
         """
-        Remove a slave context from the server.
+        Remove a device_id context from the server.
 
-        This method removes a Modbus slave context from the server's context, effectively disabling
-        communication with that particular slave.
+        This method removes a Modbus device_id context from the server's context,
+        effectively disabling communication with that particular device_id.
 
         Args:
-            slave_id (int): Unique identifier of the slave to be removed.
+            slave_id (int): Unique identifier of the device_id to be removed.
 
         Raises:
-            KeyError: If the specified slave ID does not exist in the server's context.
+            KeyError: If the specified device_id ID does not exist in the server's context.
 
         Notes:
-            - The server context is updated dynamically, allowing immediate removal of the slave.
+            - The server context is updated dynamically, allowing immediate removal
+              of the device_id.
         """
-        if slave_id in self.slaves:
-            del self.slaves[slave_id]
-            self.context = ModbusServerContext(slaves=self.slaves, single=False)
+        if slave_id in self.devices:
+            del self.devices[slave_id]
+            self.context = ModbusServerContext(devices=self.devices, single=False)
             self.logger.info("Slave with ID %s deleted successfully.", slave_id)
             if self._task is not None:
                 await self.restart()

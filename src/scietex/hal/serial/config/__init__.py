@@ -35,7 +35,7 @@ Classes:
 Attributes:
     - port (str): The serial port identifier (e.g., "COM1" on Windows, "/dev/ttyUSB0" on Linux).
     - baudrate (int): Baud rate for serial communication (default is 9600).
-    - bytesize (int): Number of data bits per character (default is 8).
+    - bytesize (int): Number of payload bits per character (default is 8).
     - parity (str): Parity checking mode ('N', 'E', 'O', 'M', 'S'; default is 'N' for no parity).
     - stopbits (float): Number of stop bits (1, 1.5, or 2; default is 1).
     - timeout (float): Read timeout in seconds (optional).

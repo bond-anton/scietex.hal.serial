@@ -166,7 +166,7 @@ def test_create_virtual_ports(vsn_fixture):  # pylint: disable=redefined-outer-n
 
 
 def test_communication(logger_fixture):  # pylint: disable=redefined-outer-name
-    """Test that data can be sent and received between the virtual serial ports."""
+    """Test that payload can be sent and received between the virtual serial ports."""
     vsn = VirtualSerialNetwork(virtual_ports_num=3, logger=logger_fixture)
     vsn.start()
 
@@ -177,14 +177,14 @@ def test_communication(logger_fixture):  # pylint: disable=redefined-outer-name
             with open(vsn.serial_ports[1], "rb", buffering=0) as port2:
                 # Open the third serial port for reading
                 with open(vsn.serial_ports[2], "rb", buffering=0) as port3:
-                    # Send data from port1
+                    # Send payload from port1
                     test_data = b"Hello, World!"
                     port1.write(test_data)
 
-                    # Read data from port2
+                    # Read payload from port2
                     received_data = port2.read(len(test_data))
                     assert received_data == test_data
-                    # Read data from port3
+                    # Read payload from port3
                     received_data = port3.read(len(test_data))
                     assert received_data == test_data
     finally:
@@ -212,13 +212,13 @@ def test_communication_external_ports(vsn_fixture, logger_fixture):
             with open(free_ports[1], "rb", buffering=0) as port2:
                 # Open the third serial port for reading
                 with open(vsn_fixture.serial_ports[1], "rb", buffering=0) as port3:
-                    # Send data from port1
+                    # Send payload from port1
                     test_data = b"Hello, World!"
                     port1.write(test_data)
-                    # Read data from port2
+                    # Read payload from port2
                     received_data = port2.read(len(test_data))
                     assert received_data == test_data
-                    # Read data from port3
+                    # Read payload from port3
                     received_data = port3.read(len(test_data))
                     assert received_data == test_data
     finally:

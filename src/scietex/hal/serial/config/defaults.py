@@ -9,7 +9,7 @@ Constants:
     DEFAULT_BAUDRATE (int): Default baud rate for serial communication (in bps). Typically set to
         9600.
     DEFAULT_BAUDRATE_LIST (tuple[int, ...]): List of supported baud rates for serial communication.
-    DEFAULT_BYTESIZE (int): Default byte size (number of data bits) for serial communication.
+    DEFAULT_BYTESIZE (int): Default byte size (number of payload bits) for serial communication.
         Commonly set to 8.
     DEFAULT_BYTESIZE_LIST (tuple[int, int, int, int]): List of supported byte sizes for serial
         communication.
@@ -30,7 +30,7 @@ These constants aim to simplify the process of configuring serial connections by
 defaults based on industry standards.
 """
 
-from typing import Union
+from typing import Optional
 
 # Baud Rate Defaults
 DEFAULT_BAUDRATE: int = 9600
@@ -61,7 +61,7 @@ DEFAULT_STOPBITS: int = 1
 DEFAULT_STOPBITS_LIST: tuple[int, int] = (1, 2)
 
 # Timeout Defaults
-DEFAULT_TIMEOUT: Union[float, None] = None
+DEFAULT_TIMEOUT: Optional[float] = None
 
 # Framer Defaults
 DEFAULT_FRAMER: str = "RTU"
