@@ -13,7 +13,7 @@ from pymodbus.exceptions import ModbusIOException
 from pymodbus.pdu import ModbusPDU, DecodePDU, pdu as base
 from pymodbus.framer import FramerAscii
 from pymodbus.logging import Log
-from pymodbus.datastore import ModbusDeviceContext
+from pymodbus.datastore import ModbusServerContext
 
 from scietex.hal.serial.virtual import VirtualSerialPair
 from scietex.hal.serial.config import ModbusSerialConnectionConfig as Config
@@ -56,7 +56,7 @@ class CustomizedASCIIFramer(FramerAscii):
                 print(lrc_len)
                 print(
                     f"{lrc_len}) DATA END: {data_end}, "
-                    + f"LRC: {data_buffer[data_end - lrc_len: data_end]}, {self.compute_LRC(msg)}"
+                    + f"LRC: {data_buffer[data_end - lrc_len : data_end]}, {self.compute_LRC(msg)}"
                     ""
                 )
                 print(f"MSG: {msg}")
@@ -270,19 +270,26 @@ class CustomizedRequest(ModbusPDU):
         # self.command = data_str[0]
         self.data = data_str
 
-    async def update_datastore(self, context: ModbusDeviceContext) -> ModbusPDU:
+    async def datastore_update(
+        self, context: ModbusServerContext, device_id: int
+    ) -> ModbusPDU:
         """Execute."""
         print(f"REQUEST UPD DATASTORE: {self.data}, {context}")
         _ = context
-        context.store["h"].values[:3] = [0, 1, 2]
-        print(f"STORE: {context.store['h'].values}")
+        await context.async_setValues(
+            device_id=device_id, func_code=0x00, address=0, values=[0, 1, 2]
+        )
+        result = await context.async_getValues(
+            device_id=device_id, func_code=0x00, address=0, count=3
+        )
+        print(f"STORE: {result}")
         response = CustomizedModbusResponse(
             self.command,
             self.data.encode(),
             dev_id=self.dev_id,
             transaction_id=self.transaction_id,
         )
-        response.registers = context.store["h"].values
+        response.registers = list(result)
         return response
 
 
