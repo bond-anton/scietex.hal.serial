@@ -15,7 +15,7 @@ classifiers = [
   "Operating System :: OS Independent",
 ]
 requires-python = ">=3.10"
-dependencies = ["pymodbus[serial] == 3.11.4"]
+dependencies = ["pymodbus[serial] == 3.12.1"]
 
 [project.urls]
 "Homepage" = "https://github.com/bond-anton/scietex.hal.serial"

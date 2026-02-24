@@ -1,1 +1,7 @@
 /src/scietex.hal.serial.egg-info/
+/.venv
+/.tox
+/.mypy_cache
+/.coverage
+__pycache__
+uv.lock
