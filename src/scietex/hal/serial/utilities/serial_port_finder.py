@@ -2,7 +2,6 @@
 
 import serial.tools.list_ports
 
-
 # STM32 constants.
 STM_VID = 0x0483  # STMicroelectronics
 STM_PID = 0x5740  # CDC Virtual COM Port

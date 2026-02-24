@@ -6,7 +6,6 @@ from multiprocessing import Pipe
 
 import pytest
 
-
 try:
     from src.scietex.hal.serial.utilities.mock import mock_openpty
     from src.scietex.hal.serial.virtual.worker import create_serial_network

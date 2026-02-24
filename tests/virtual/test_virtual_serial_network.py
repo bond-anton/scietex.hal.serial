@@ -5,7 +5,6 @@ from logging import Logger
 
 import pytest
 
-
 try:
     from src.scietex.hal.serial.utilities.mock import mock_openpty
     from src.scietex.hal.serial.config import SerialConnectionConfig

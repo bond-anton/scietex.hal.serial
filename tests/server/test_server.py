@@ -6,7 +6,6 @@ from pymodbus.client import AsyncModbusSerialClient
 
 import pytest
 
-
 try:
     from src.scietex.hal.serial.utilities.modbus import modbus_connection_config
     from src.scietex.hal.serial.config import (

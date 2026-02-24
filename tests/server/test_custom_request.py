@@ -33,7 +33,6 @@ from tests.fixtures import (
     rs485_srv,
 )
 
-
 Log.setLevel(logging.DEBUG)
 
 

@@ -45,7 +45,6 @@ from ..config import (
 from ..utilities.modbus import modbus_connection_config
 from .modbus_datablock import ReactiveSequentialDataBlock
 
-
 SERVER_INFO = {
     "VendorName": "SCIETEX",
     "ProductCode": "SSMBRS",
