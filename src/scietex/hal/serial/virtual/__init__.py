@@ -34,3 +34,5 @@ without physical hardware, offering a versatile toolset for testing and prototyp
 
 from .virtual_serial_network import VirtualSerialNetwork
 from .virtual_serial_pair import VirtualSerialPair
+
+__all__ = ["VirtualSerialNetwork", "VirtualSerialPair"]

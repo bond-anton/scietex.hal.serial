@@ -116,17 +116,20 @@ class RS485Server:
                 raise TypeError(
                     "The 'devices' argument must be a dict mapping integers to ModbusDeviceContext."
                 )
-            for addr, store in devices.items():
+            for device_address, store in devices.items():
                 if (
                     isinstance(store, ModbusDeviceContext)
-                    and isinstance(addr, int)
-                    and 0 < addr < 248
+                    and isinstance(device_address, int)
+                    and 0 < device_address < 248
                 ):
-                    self.devices[addr] = store
+                    self.devices[device_address] = store
         else:
-            block = ReactiveSequentialDataBlock(0x01, [17] * 100)
+            device_address = 0x01  # Default device address is 1.
+            store_length = 100
+            store_data = [156] * store_length
+            block = ReactiveSequentialDataBlock(device_address, store_data)
             store = ModbusDeviceContext(di=block, co=block, hr=block, ir=block)
-            self.devices = {0x01: store}
+            self.devices = {device_address: store}
 
         self.context = ModbusServerContext(devices=self.devices, single=False)
         self.identity = ModbusDeviceIdentification(info_name=SERVER_INFO)
@@ -230,7 +233,7 @@ class RS485Server:
             - If the server is not running, this method has no effect.
         """
         if self._task is not None:
-            if self.server.is_active():
+            if self.server and self.server.is_active():
                 await self.server.shutdown()
             self._task.cancel()
             try:

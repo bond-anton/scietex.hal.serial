@@ -13,7 +13,8 @@
     "pylint",
     "asyncio",
     "pythonpath",
-    "mypy"
+    "mypy",
+    "datablock"
   ],
   "ignoreWords": [],
   "import": []

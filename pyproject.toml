@@ -15,7 +15,7 @@ classifiers = [
   "Operating System :: OS Independent",
 ]
 requires-python = ">=3.10"
-dependencies = ["pymodbus[serial] == 3.12.1"]
+dependencies = ["pymodbus[serial] ~= 3.12"]
 
 [project.urls]
 "Homepage" = "https://github.com/bond-anton/scietex.hal.serial"
@@ -23,7 +23,12 @@ dependencies = ["pymodbus[serial] == 3.12.1"]
 
 [project.optional-dependencies]
 dev = ["tox>=4.46.0"]
-test = ["flake8", "pytest", "pytest-asyncio"]
+test = [
+    "flake8",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-timeout>=2.4.0",
+]
 lint = ["pylint"]
 
 [tool.setuptools.dynamic]

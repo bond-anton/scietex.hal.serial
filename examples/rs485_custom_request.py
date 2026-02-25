@@ -8,6 +8,7 @@ This example is just to show how one can implement custom protocol using
 import asyncio
 from typing import Optional
 
+from pymodbus.constants import ExcCodes
 from pymodbus import ModbusException
 from pymodbus.exceptions import ModbusIOException
 from pymodbus.pdu import ModbusPDU, DecodePDU, pdu as base
@@ -162,6 +163,8 @@ class CustomizedDecodePDU(DecodePDU):
             print(f"DECODER PDU TYPE: {pdu_class}")
             command: str = frame.decode()[0]
             print(f"CMD: {command}, DATA: {frame[1:]}")
+            if not issubclass(pdu_class, (CustomizedRequest, CustomizedModbusResponse)):
+                raise ModbusException(f"Unknown response PDU {type(pdu_class)}")
             pdu = pdu_class(command=command, data=frame[1:])
             pdu.decode(frame[1:])
             Log.debug(
@@ -248,8 +251,6 @@ class CustomizedRequest(ModbusPDU):
         self.data: str = ""
         if data is not None:
             self.data = data[:6].decode()
-            # data_trunc = int(str(payload)[:6])
-            # self.payload = f"{data_trunc:<6d}".strip()
         self.rtu_frame_size = len(self.data)
 
     def encode(self):
@@ -274,22 +275,30 @@ class CustomizedRequest(ModbusPDU):
         self, context: ModbusServerContext, device_id: int
     ) -> ModbusPDU:
         """Execute."""
-        print(f"REQUEST UPD DATASTORE: {self.data}, {context}")
-        _ = context
-        await context.async_setValues(
-            device_id=device_id, func_code=0x00, address=0, values=[0, 1, 2]
-        )
-        result = await context.async_getValues(
-            device_id=device_id, func_code=0x00, address=0, count=3
-        )
-        print(f"STORE: {result}")
         response = CustomizedModbusResponse(
             self.command,
             self.data.encode(),
             dev_id=self.dev_id,
             transaction_id=self.transaction_id,
         )
-        response.registers = list(result)
+        print(f"REQUEST UPD DATASTORE: {self.data}, {context}")
+        # To setValues in correct Data Store choose corresponding function code.
+        # The _fx_mapper used in pymodbus configured in the following way.
+        # _fx_mapper = {2: "d", 4: "i"}
+        # _fx_mapper.update([(i, "h") for i in (3, 6, 16, 22, 23)])
+        # _fx_mapper.update([(i, "c") for i in (1, 5, 15)])
+        # I want to use holding registers, so will use 6 for writing 3 for reading.
+        await context.async_setValues(
+            device_id=device_id, func_code=0x06, address=0, values=[0, 1, 2]
+        )
+        result = await context.async_getValues(
+            device_id=device_id, func_code=0x03, address=0, count=3
+        )
+        if isinstance(result, ExcCodes):
+            print(f"Got an Exception {result}")
+        else:
+            print(f"STORE: {result}")
+            response.registers = list(result)
         return response
 
 
@@ -317,11 +326,14 @@ async def main(server_params: Config, client_params: Config):
     request = CustomizedRequest("T", data=some_data_int, dev_id=1, transaction_id=0)
 
     # Send the request to the server
-    response: ModbusPDU = await client.execute(request, no_response_expected=False)
-    print(f"Response: {response}")
-    print(f"Response: {response.registers}")
-    print(f"Response: {response.data}")
-    print(isinstance(response, CustomizedModbusResponse))
+    response: ModbusPDU | None = await client.execute(
+        request, no_response_expected=False
+    )
+    if response:
+        print(f"Response: {response}")
+        print(f"Response: {response.registers}")
+    if isinstance(response, CustomizedModbusResponse):
+        print(f"Response: {response.data}")
     print(f"SERVER CTX: {server.devices[1].store['h'].values}")
     await server.stop()
 

@@ -202,7 +202,8 @@ class VirtualSerialNetwork:
         """
         if self.__p is not None:
             self.logger.debug("VSN: STOPPING")
-            self.__master_io.send({"cmd": "stop"})
+            if self.__master_io:
+                self.__master_io.send({"cmd": "stop"})
             self.__p.join(timeout=5)  # Wait for the process to terminate
 
             self.__p = None

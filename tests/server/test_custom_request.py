@@ -6,11 +6,13 @@ from typing import Optional
 import pytest
 
 from pymodbus import ModbusException
+
+# from pymodbus.constants import ExcCodes
 from pymodbus.exceptions import ModbusIOException
 from pymodbus.pdu import ModbusPDU, DecodePDU, pdu as base
 from pymodbus.framer import FramerAscii
 from pymodbus.logging import Log
-from pymodbus.datastore import ModbusDeviceContext
+from pymodbus.datastore import ModbusServerContext
 
 try:
     from src.scietex.hal.serial.config import ModbusSerialConnectionConfig as Config
@@ -28,8 +30,6 @@ from tests.fixtures import (
     vsp_fixture,
     store_fixture,
     single_slave_fixture,
-    server_config,
-    client_config,
     rs485_srv,
 )
 
@@ -111,7 +111,12 @@ class CustomDecodePDU(DecodePDU):
         function_code = 0
         return self.pdu_table.get(function_code, (None, None))[self.pdu_inx]
 
+    def register(self, custom_class: type[base.ModbusPDU]) -> None:
+        # print(f"REGISTER: {custom_class}")
+        super().register(custom_class)
+
     def decode(self, frame: bytes) -> Optional[base.ModbusPDU]:
+        # print(f"DECODER DECODING FRAME: {frame}, {frame.decode()}")
         try:
             function_code = 0
             if not (
@@ -121,8 +126,12 @@ class CustomDecodePDU(DecodePDU):
             ):
                 Log.debug("decode PDU failed for function code {}", function_code)
                 raise ModbusException(f"Unknown response {function_code}")
+            # print(f"DECODER PDU TYPE: {pdu_class}")
             command: str = frame.decode()[0]
-            pdu = pdu_class(command=command, data=int(frame.decode()[1:]))
+            # print(f"CMD: {command}, DATA: {frame[1:]}")
+            if not issubclass(pdu_class, (CustomRequest, CustomModbusResponse)):
+                raise ModbusException(f"Unknown response PDU {type(pdu_class)}")
+            pdu = pdu_class(command=command, data=frame[1:])
             pdu.decode(frame[1:])
             Log.debug(
                 "decoded PDU function_code({} sub {}) -> {} ",
@@ -130,6 +139,10 @@ class CustomDecodePDU(DecodePDU):
                 pdu.sub_function_code,
                 str(pdu),
             )
+            # print(
+            #     f"decoded PDU function_code({pdu_class.function_code}) -> {str(pdu_class)} "
+            # )
+            pdu.registers = list(frame)[1:]
             return pdu
         except (ModbusException, ValueError, IndexError) as exc:
             Log.warning("Unable to decode frame {}", exc)
@@ -156,11 +169,7 @@ class CustomModbusResponse(ModbusPDU):
         self.function_code = self.command.encode()[0]
         self.data: str = ""
         if data is not None:
-            if isinstance(data, int):
-                data_truncated = int(str(data)[:6])
-                self.data = f"{data_truncated:<6d}".strip()
-            else:
-                self.data = data.decode()
+            self.data = data[:6].decode()
         self.rtu_frame_size = len(self.data)
 
     def encode(self):
@@ -188,7 +197,7 @@ class CustomRequest(ModbusPDU):
     def __init__(
         self,
         command: Optional[str] = None,
-        data: Optional[int] = None,
+        data: Optional[bytes] = None,
         dev_id=1,
         transaction_id=0,
     ):
@@ -200,8 +209,7 @@ class CustomRequest(ModbusPDU):
         self.function_code = self.command.encode()[0]
         self.data: str = ""
         if data is not None:
-            data_truncated = int(str(data)[:6])
-            self.data = f"{data_truncated:<6d}".strip()
+            self.data = data[:6].decode()
         self.rtu_frame_size = len(self.data)
 
     def encode(self):
@@ -214,21 +222,42 @@ class CustomRequest(ModbusPDU):
         data_str = data.decode()
         self.data = data_str
 
-    async def update_datastore(self, context: ModbusDeviceContext) -> ModbusPDU:
+    async def datastore_update(
+        self, context: ModbusServerContext, device_id: int
+    ) -> ModbusPDU:
         """Execute."""
-        _ = context
-        return CustomModbusResponse(
+        _, _ = context, device_id
+        response = CustomModbusResponse(
             self.command,
             self.data.encode(),
             dev_id=self.dev_id,
             transaction_id=self.transaction_id,
         )
+        # print(f"REQUEST UPD DATASTORE: {self.data}, {context}")
+        # To setValues in correct Data Store choose corresponding function code.
+        # The _fx_mapper used in pymodbus configured in the following way.
+        # _fx_mapper = {2: "d", 4: "i"}
+        # _fx_mapper.update([(i, "h") for i in (3, 6, 16, 22, 23)])
+        # _fx_mapper.update([(i, "c") for i in (1, 5, 15)])
+        # I want to use holding registers, so will use 6 for writing 3 for reading.
+        # await context.async_setValues(
+        #     device_id=device_id, func_code=0x06, address=0, values=[0, 1, 2]
+        # )
+        # result = await context.async_getValues(
+        #     device_id=device_id, func_code=0x03, address=0, count=3
+        # )
+        # if isinstance(result, ExcCodes):
+        #     print(f"Got an Exception {result}")
+        # else:
+        #     print(f"STORE: {result}")
+        #     response.registers = list(result)
+        return response
 
 
 def test_custom_framer():
     """Test custom framer operation."""
     custom_framer = CustomASCIIFramer(CustomDecodePDU(is_server=False))
-    my_data = 123456
+    my_data = b"123456"
     # my_data = None
     cr = CustomRequest("i", data=my_data, dev_id=1, transaction_id=0)
     payload = cr.encode()
@@ -264,12 +293,14 @@ async def test_custom_request_client(vsp_fixture):
         custom_response=[CustomModbusResponse],
         label="MY TOY",
     )
-    some_data = 123456
+    some_data = b"123456"
     request = CustomRequest("i", data=some_data, dev_id=1, transaction_id=0)
     # Send the request to the server
     response = await client.execute(request, no_response_expected=False)
+    # print(response)
     assert isinstance(response, CustomModbusResponse)
-    assert response.data == f"{some_data}"
+    # print(response.data)
+    assert response.data == some_data.decode()
 
     await server.stop()
 
