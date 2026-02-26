@@ -17,17 +17,6 @@ except ModuleNotFoundError:
     from scietex.hal.serial.config import ModbusSerialConnectionConfig as Config
     from scietex.hal.serial.server.rs485_server import RS485Server, SERVER_INFO
 
-# pylint: disable=import-error,unused-import
-from tests.fixtures import (
-    logger_fixture,
-    vsp_fixture,
-    store_fixture,
-    single_slave_fixture,
-    server_config,
-    client_config,
-    rs485_srv,
-)
-
 
 @pytest.mark.asyncio
 async def test_initialization(

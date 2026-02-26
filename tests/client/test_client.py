@@ -15,18 +15,6 @@ except ModuleNotFoundError:
     from scietex.hal.serial.utilities.numeric import ByteOrder
 
 
-# pylint: disable=import-error,unused-import
-from tests.fixtures import (
-    logger_fixture,
-    vsp_fixture,
-    store_fixture,
-    single_slave_fixture,
-    server_config,
-    client_config,
-    rs485_srv,
-)
-
-
 # pylint: disable=redefined-outer-name
 @pytest.mark.asyncio
 async def test_client_init(client_config, logger_fixture) -> None:

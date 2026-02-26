@@ -16,9 +16,6 @@ except ModuleNotFoundError:
     from scietex.hal.serial.config import SerialConnectionMinimalConfig
     from scietex.hal.serial.virtual.virtual_serial_pair import VirtualSerialPair
 
-# pylint: disable=import-error,unused-import
-from tests.fixtures import logger_fixture
-
 
 def test_initialization(logger_fixture):  # pylint: disable=redefined-outer-name
     """Test that the VirtualSerialPair initializes correctly."""

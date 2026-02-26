@@ -24,15 +24,6 @@ except ModuleNotFoundError:
     from scietex.hal.serial.client import RS485Client
 
 
-# pylint: disable=import-error,unused-import
-from tests.fixtures import (
-    logger_fixture,
-    vsp_fixture,
-    store_fixture,
-    single_slave_fixture,
-    rs485_srv,
-)
-
 Log.setLevel(logging.DEBUG)
 
 

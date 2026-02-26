@@ -18,9 +18,6 @@ except ModuleNotFoundError:
         VirtualSerialNetwork,
     )
 
-# pylint: disable=import-error,unused-import
-from tests.fixtures import logger_fixture, vsn_fixture
-
 
 def test_initialization(logger_fixture):  # pylint: disable=redefined-outer-name
     """Test that the VirtualSerialNetwork initializes correctly."""

@@ -54,18 +54,6 @@ except ModuleNotFoundError:
     )
 
 
-# pylint: disable=import-error,unused-import
-from tests.fixtures import (
-    logger_fixture,
-    vsp_fixture,
-    store_fixture,
-    single_slave_fixture,
-    server_config,
-    client_config,
-    rs485_srv,
-)
-
-
 def test_client_config() -> None:
     """
     Test modbus_client_config function.

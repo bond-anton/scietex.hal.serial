@@ -14,10 +14,6 @@ except ModuleNotFoundError:
     from scietex.hal.serial.virtual.worker import create_serial_network
 
 
-# pylint: disable=import-error,unused-import
-from tests.fixtures import logger_fixture
-
-
 def test_generate_serial_pair():
     """Test that generate_serial_pair creates a pair of serial ports."""
     parent_conn, child_conn = Pipe()
