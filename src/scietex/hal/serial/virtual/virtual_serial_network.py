@@ -30,10 +30,13 @@ This class encapsulates the complexity of managing multiple serial ports, allowi
 on higher-level tasks such as simulating device behavior or integrating external hardware.
 """
 
-from typing import Optional, Callable
+from typing import Callable
 from multiprocessing import Pipe, Process
 from multiprocessing.connection import Connection
+
 from logging import Logger, getLogger
+
+from pathlib import Path
 
 from .worker import create_serial_network
 from ..config import SerialConnectionMinimalConfig
@@ -58,7 +61,11 @@ class VirtualSerialNetwork:
         loopback (bool): Determines whether loopback mode is enabled. In loopback mode, payload sent
             from a port is also received by itself.
         logger (Logger): A logging handler for recording debug, info, warning, and error messages
-            related to the virtual network's operation.
+            related to the virtual network's operation. Defaults to a basic logger if none
+            is provided.
+        data_log_dir (str | None): Optional directory path for logging data payloads.
+            If provided, all data sent and received through the virtual network will be logged
+            to this directory.
 
     Methods:
         start(self, openpty_func=None): Starts the virtual serial network and initializes
@@ -70,12 +77,15 @@ class VirtualSerialNetwork:
         remove(self, remove_list: list[str]): Removes specified ports from the network.
     """
 
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
     def __init__(
         self,
         virtual_ports_num: int = 2,
-        external_ports: Optional[list[SerialConnectionMinimalConfig]] = None,
+        external_ports: list[SerialConnectionMinimalConfig] | None = None,
         loopback: bool = False,
-        logger: Optional[Logger] = None,
+        logger: Logger | None = None,
+        data_log_dir: str | None = None,
+        data_logging_splitter: bytes | None = None,
     ) -> None:
         """
         Initializes the VirtualSerialNetwork instance.
@@ -89,9 +99,13 @@ class VirtualSerialNetwork:
                 received by itself. Defaults to False.
             logger (Optional[Logger], optional): A logging handler for recording operational
                 information. Defaults to a basic logger if none is provided.
-        """
-        self.__master_io: Optional[Connection] = None
-        self.__worker_io: Optional[Connection] = None
+            data_log_dir (Optional[str], optional): Directory path for logging data payloads.
+                If None, data logging is disabled. Defaults to None.
+            data_logging_splitter (Optional[bytes], optional): Optional byte sequence to split
+                logged data into separate log entries. If None, data is logged as a single entry.
+                Defaults to None."""
+        self.__master_io: Connection | None = None
+        self.__worker_io: Connection | None = None
         self.__p: Process | None = None
         self.loopback: bool = loopback
         self.external_ports: list[SerialConnectionMinimalConfig] = (
@@ -102,8 +116,24 @@ class VirtualSerialNetwork:
         self.serial_ports: list[str] = []
 
         self.logger: Logger = logger if isinstance(logger, Logger) else getLogger()
+        self.data_logging_splitter: bytes | None = data_logging_splitter
+        self.data_logging_file: str | None = None
+        self.data_log_dir: str | None = data_log_dir
+        if self.data_log_dir is not None:
+            try:
+                Path(self.data_log_dir).mkdir(parents=True, exist_ok=True)
+                self.data_logging_file = str(Path(self.data_log_dir) / "vsn-data.log")
+                self.logger.info(
+                    "VSN: Data logging enabled. Log file: %s", self.data_logging_file
+                )
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                self.logger.error(
+                    "VSN: Failed to create data log directory: %s. Data logging disabled.",
+                    e,
+                )
+                self.data_log_dir = None
 
-    def start(self, openpty_func: Optional[Callable] = None):
+    def start(self, openpty_func: Callable | None = None):
         """
         Start the virtual serial network and initialize communication.
 
@@ -114,10 +144,10 @@ class VirtualSerialNetwork:
         Args:
             openpty_func (Optional[Callable], optional): An alternative function for opening
                 pseudo-terminal pairs. Defaults to `pty.openpty`.
-
-        Raises:
-            RuntimeError: If the network is already running.
         """
+        if self.__p is not None:
+            self.logger.debug("VSN: ERROR VSN is already running.")
+            return
         self.logger.debug("VSN: STARTING")
         self.__master_io, self.__worker_io = Pipe()
         external_ports = None
@@ -134,6 +164,9 @@ class VirtualSerialNetwork:
                 external_ports,
                 self.loopback,
                 openpty_func,
+                self.logger,
+                self.data_logging_file,
+                self.data_logging_splitter,
             ),
         )
         self.__p.start()
@@ -143,6 +176,7 @@ class VirtualSerialNetwork:
             if response["status"] == "ERROR":
                 self.logger.error("VSN: ERROR (%s)", response["payload"]["error"])
             elif response["status"] == "OK":
+                self.logger.info("VSN: Virtual Port %s created", response["payload"])
                 self.serial_ports.append(response["payload"])
                 self.virtual_ports_num += 1
         ports_connected = []
@@ -151,6 +185,7 @@ class VirtualSerialNetwork:
             if response["status"] == "ERROR":
                 self.logger.error("VSN: ERROR (%s)", response["payload"]["error"])
             elif response["status"] == "OK":
+                self.logger.info("VSN: External Port %s added", response["payload"])
                 ports_connected.append(response["payload"])
         self._update_ext_ports(ports_connected)
         self._ext_ports_remove_duplicates()
@@ -239,6 +274,7 @@ class VirtualSerialNetwork:
                 elif response["status"] == "OK":
                     for port in list(set(external_ports)):
                         if port.port == response["payload"]:
+                            self.logger.info("VSN: Port %s added", response["payload"])
                             ports_connected.append(port)
                             break
             self.external_ports += ports_connected
@@ -263,6 +299,7 @@ class VirtualSerialNetwork:
                 if response["status"] == "ERROR":
                     self.logger.error("VSN: ERROR (%s)", response["payload"]["error"])
                 elif response["status"] == "OK":
+                    self.logger.info("VSN: Port %s created", response["payload"])
                     self.serial_ports.append(response["payload"])
                     self.virtual_ports_num += 1
 
@@ -286,6 +323,7 @@ class VirtualSerialNetwork:
                 if response["status"] == "NOT_EXIST":
                     self.logger.warning("VSN: Port %s not found", response["payload"])
                 elif response["status"] == "OK":
+                    self.logger.info("VSN: Port %s removed", response["payload"])
                     removed_ports.append(response["payload"])
             for port in removed_ports:
                 found = False

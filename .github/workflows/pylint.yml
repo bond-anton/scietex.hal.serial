@@ -19,7 +19,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e .[all,test,lint]
           python -m pip install pylint
-      - name: Analysing the code with pylint
+      - name: Analyzing the code with pylint
         run: |
           pylint src tests examples
 

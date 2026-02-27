@@ -5,4 +5,4 @@ Attributes:
     __version__ (str): The current version of the package.
 """
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
