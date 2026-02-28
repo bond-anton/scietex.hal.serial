@@ -5,6 +5,8 @@ import time
 
 from scietex.hal.serial import VirtualSerialNetwork, SerialConnectionConfig
 
+# pylint: disable=duplicate-code
+
 
 def get_colored_logger(name, level=logging.DEBUG):
     """Creates a logger with colored output based on the log level."""
