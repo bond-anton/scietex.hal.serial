@@ -14,7 +14,15 @@
     "asyncio",
     "pythonpath",
     "mypy",
-    "datablock"
+    "datablock",
+    "devid",
+    "ttyname",
+    "baudrate",
+    "SSMBRS",
+    "addopts",
+    "posargs",
+    "pyserial",
+    "serialposix"
   ],
   "ignoreWords": [],
   "import": []
