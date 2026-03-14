@@ -144,11 +144,11 @@ def validate_parity(parity: Optional[str]) -> str:
     return parity
 
 
-def validate_stopbits(stopbits: Optional[int]) -> int:
+def validate_stopbits(stopbits: Optional[int | float]) -> int | float:
     """
     Validate the stopbits value.
 
-    Ensures that the number of stop bits is either 1 or 2.
+    Ensures that the number of stop bits is either 1 or 1.5 or 2.
 
     Args:
         stopbits (int): Stop bits to validate.
@@ -158,9 +158,9 @@ def validate_stopbits(stopbits: Optional[int]) -> int:
     """
     if stopbits is None:
         return DEFAULT_STOPBITS
-    if not isinstance(stopbits, int):
+    if not isinstance(stopbits, (int, float)):
         raise SerialConnectionConfigError(
-            f"Stopbits must be integer number, got {type(stopbits)}"
+            f"Stopbits must be integer or float number, got {type(stopbits)}"
         )
     if stopbits not in DEFAULT_STOPBITS_LIST:
         raise SerialConnectionConfigError(f"Invalid stopbits: {stopbits}")

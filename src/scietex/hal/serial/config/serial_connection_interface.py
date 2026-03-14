@@ -45,7 +45,7 @@ class SerialConnectionMinimalConfigModel(ABC):
         baudrate (int): The baud rate for serial communication.
         bytesize (int): The number of payload bits.
         parity (str): The parity setting for the communication.
-        stopbits (int): The number of stop bits used in the communication.
+        stopbits (int | float): The number of stop bits used in the communication.
 
     Methods:
         to_dict() -> dict: Converts the serial connection config to a dictionary.
@@ -133,7 +133,7 @@ class SerialConnectionMinimalConfigModel(ABC):
 
     @property
     @abstractmethod
-    def stopbits(self) -> int:
+    def stopbits(self) -> int | float:
         """
         Gets the number of stop bits.
 
@@ -143,7 +143,7 @@ class SerialConnectionMinimalConfigModel(ABC):
 
     @stopbits.setter
     @abstractmethod
-    def stopbits(self, value: int) -> None:
+    def stopbits(self, value: int | float) -> None:
         """
         Sets the number of stop bits.
 
@@ -174,7 +174,7 @@ class SerialConnectionConfigModel(SerialConnectionMinimalConfigModel):
         baudrate (int): The baud rate for serial communication.
         bytesize (int): The number of payload bits.
         parity (str): The parity setting for the communication.
-        stopbits (int): The number of stop bits used in the communication.
+        stopbits (int | float): The number of stop bits used in the communication.
         timeout (Optional[float]): The timeout for the serial connection in seconds.
         write_timeout (Optional[float]): The write timeout for the serial connection in seconds.
         inter_byte_timeout (Optional[float]): The timeout between bytes during transmission.
@@ -256,7 +256,7 @@ class ModbusSerialConnectionConfigModel(SerialConnectionMinimalConfigModel):
         baudrate (int): The baud rate for serial communication.
         bytesize (int): The number of payload bits.
         parity (str): The parity setting for the communication.
-        stopbits (int): The number of stop bits used in the communication.
+        stopbits (int | float): The number of stop bits used in the communication.
         timeout (Optional[float]): The timeout for the serial connection in seconds.
         framer (str): The Modbus framer type (e.g., "RTU", "ASCII").
 

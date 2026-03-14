@@ -42,7 +42,7 @@ Attributes:
     - baudrate (int): The baud rate for serial communication.
     - bytesize (int): The number of payload bits.
     - parity (str): The parity setting for the communication.
-    - stopbits (int): The number of stop bits used in the communication.
+    - stopbits (int | float): The number of stop bits used in the communication.
     - timeout (Optional[float]): The timeout for the serial connection in seconds.
     - write_timeout (Optional[float]): The write timeout for the serial connection in seconds.
     - inter_byte_timeout (Optional[float]): The timeout between bytes during transmission.
@@ -94,7 +94,7 @@ class SerialConnectionMinimalConfig(SerialConnectionMinimalConfigModel):
         baudrate (int): The baud rate for serial communication.
         bytesize (int): The number of payload bits.
         parity (str): The parity setting for the communication.
-        stopbits (int): The number of stop bits used in the communication.
+        stopbits (int | float): The number of stop bits used in the communication.
 
     Methods:
         to_dict() -> dict: Converts the serial connection config to a dictionary.
@@ -107,7 +107,7 @@ class SerialConnectionMinimalConfig(SerialConnectionMinimalConfigModel):
         baudrate: Optional[int] = None,
         bytesize: Optional[int] = None,
         parity: Optional[str] = None,
-        stopbits: Optional[int] = None,
+        stopbits: Optional[int | float] = None,
         **kwargs,
     ) -> None:
         self._port: str = validate_port(port)
@@ -176,7 +176,7 @@ class SerialConnectionMinimalConfig(SerialConnectionMinimalConfigModel):
         self._parity = validate_parity(value)
 
     @property
-    def stopbits(self) -> int:
+    def stopbits(self) -> int | float:
         """
         The serial port stopbits (1 or 2).
 
@@ -186,7 +186,7 @@ class SerialConnectionMinimalConfig(SerialConnectionMinimalConfigModel):
         return self._stopbits
 
     @stopbits.setter
-    def stopbits(self, value: int) -> None:
+    def stopbits(self, value: int | float) -> None:
         self._stopbits = validate_stopbits(value)
 
     def to_dict(self) -> dict:
@@ -263,7 +263,7 @@ class SerialConnectionConfig(
         baudrate (int): The baud rate for serial communication.
         bytesize (int): The number of payload bits.
         parity (str): The parity setting for the communication.
-        stopbits (int): The number of stop bits used in the communication.
+        stopbits (int | float): The number of stop bits used in the communication.
         timeout (Optional[float]): The timeout for the serial connection in seconds.
         write_timeout (Optional[float]): The write timeout for the serial connection in seconds.
         inter_byte_timeout (Optional[float]): The timeout between bytes during transmission.
@@ -279,7 +279,7 @@ class SerialConnectionConfig(
         baudrate: Optional[int] = None,
         bytesize: Optional[int] = None,
         parity: Optional[str] = None,
-        stopbits: Optional[int] = None,
+        stopbits: Optional[int | float] = None,
         timeout: Optional[float] = None,
         write_timeout: Optional[float] = None,
         inter_byte_timeout: Optional[float] = None,
@@ -402,7 +402,7 @@ class ModbusSerialConnectionConfig(
         baudrate (int): The baud rate for serial communication.
         bytesize (int): The number of payload bits.
         parity (str): The parity setting for the communication.
-        stopbits (int): The number of stop bits used in the communication.
+        stopbits (int | float): The number of stop bits used in the communication.
         timeout (Optional[float]): The timeout for the serial connection in seconds.
         framer (str): The Modbus framer type (e.g., "RTU", "ASCII").
 
@@ -417,7 +417,7 @@ class ModbusSerialConnectionConfig(
         baudrate: Optional[int] = None,
         bytesize: Optional[int] = None,
         parity: Optional[str] = None,
-        stopbits: Optional[int] = None,
+        stopbits: Optional[int | float] = None,
         timeout: Optional[float] = None,
         framer: Optional[str] = None,
         **kwargs,

@@ -136,9 +136,7 @@ def test_validate_stopbits() -> None:
     """
     Test stopbits validation function.
     """
-    # Stopbits is not an integer.
-    with pytest.raises(SerialConnectionConfigError):
-        validate_stopbits(1.0)
+    # Stopbits is not a number.
     with pytest.raises(SerialConnectionConfigError):
         validate_stopbits("2")
     # Stopbits is not in DEFAULT_STOPBITS_LIST.

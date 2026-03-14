@@ -17,7 +17,7 @@ Constants:
         (no parity).
     DEFAULT_PARITY_LIST (tuple[str, str, str]): List of supported parity settings for serial
         communication.
-    DEFAULT_STOPBITS (int): Default number of stop bits for serial communication.
+    DEFAULT_STOPBITS (int | float): Default number of stop bits for serial communication.
         Typically set to 1.
     DEFAULT_STOPBITS_LIST (tuple[int, int]): List of supported stop bit counts for serial
         communication.
@@ -58,7 +58,7 @@ DEFAULT_PARITY_LIST: tuple[str, str, str] = ("N", "E", "O")
 
 # Stop Bits Defaults
 DEFAULT_STOPBITS: int = 1
-DEFAULT_STOPBITS_LIST: tuple[int, int] = (1, 2)
+DEFAULT_STOPBITS_LIST: tuple[int, float, int] = (1, 1.5, 2)
 
 # Timeout Defaults
 DEFAULT_TIMEOUT: Optional[float] = None

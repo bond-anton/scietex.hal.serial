@@ -141,8 +141,6 @@ def test_constructor_stopbits() -> None:
     with pytest.raises(SerialConnectionConfigError):
         _ = Config(port_name, stopbits=3)
     with pytest.raises(SerialConnectionConfigError):
-        _ = Config(port_name, stopbits=2.0)
-    with pytest.raises(SerialConnectionConfigError):
         _ = Config(port_name, stopbits="1")
     for stopbits in DEFAULT_STOPBITS_LIST:
         conf = Config(port_name, stopbits=stopbits)
