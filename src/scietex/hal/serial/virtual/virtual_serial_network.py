@@ -246,7 +246,7 @@ class VirtualSerialNetwork:
             self.serial_ports = []
             self.logger.info("VSN: STOPPED")
 
-    def add(self, external_ports: list[SerialConnectionMinimalConfig]):
+    def add(self, external_ports: list[SerialConnectionMinimalConfig]) -> list[str]:
         """
         Add external ports to the network.
 
@@ -256,7 +256,10 @@ class VirtualSerialNetwork:
         Args:
             external_ports (list[SerialConnectionMinimalConfig]): List of external serial ports
                 to add.
+        Return:
+            List of added ports.
         """
+        added_ports: list[str] = []
         if self.__master_io is not None:
             ext_ports = [
                 con_params.to_dict() for con_params in list(set(external_ports))
@@ -275,14 +278,16 @@ class VirtualSerialNetwork:
                     for port in list(set(external_ports)):
                         if port.port == response["payload"]:
                             self.logger.info("VSN: Port %s added", response["payload"])
+                            added_ports.append(response["payload"])
                             ports_connected.append(port)
                             break
             self.external_ports += ports_connected
             self._ext_ports_remove_duplicates()
             self.serial_ports += [port.port for port in ports_connected]
             self.serial_ports = list(set(self.serial_ports))
+        return added_ports
 
-    def create(self, ports_num: int):
+    def create(self, ports_num: int) -> list[str]:
         """
         Create new virtual ports in the network.
 
@@ -291,7 +296,11 @@ class VirtualSerialNetwork:
 
         Args:
             ports_num (int): Number of new virtual ports to create.
+
+        Return:
+            list of created ports.
         """
+        new_ports: list[str] = []
         if self.__master_io is not None:
             self.__master_io.send({"cmd": "create", "payload": ports_num})
             for _ in range(ports_num):
@@ -301,9 +310,11 @@ class VirtualSerialNetwork:
                 elif response["status"] == "OK":
                     self.logger.info("VSN: Port %s created", response["payload"])
                     self.serial_ports.append(response["payload"])
+                    new_ports.append(response["payload"])
                     self.virtual_ports_num += 1
+        return new_ports
 
-    def remove(self, remove_list: list[str]):
+    def remove(self, remove_list: list[str]) -> list[str]:
         """
         Remove port from the network.
 
@@ -312,10 +323,13 @@ class VirtualSerialNetwork:
 
         Args:
             remove_list (list[str]): List of ports to remove from the network.
+        Return:
+            list of created ports.
         """
+        removed_ports: list[str] = []
         if self.__master_io is not None:
             self.__master_io.send({"cmd": "remove", "payload": remove_list})
-            removed_ports = []
+
             for _ in range(len(remove_list)):
                 response = self.__master_io.recv()
                 if response["status"] == "ERROR":
@@ -335,3 +349,4 @@ class VirtualSerialNetwork:
                 if not found:
                     self.virtual_ports_num -= 1
             self.serial_ports = list(set(self.serial_ports) - set(removed_ports))
+        return removed_ports
