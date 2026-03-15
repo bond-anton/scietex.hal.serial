@@ -22,7 +22,10 @@
     "addopts",
     "posargs",
     "pyserial",
-    "serialposix"
+    "serialposix",
+    "signum",
+    "pthread",
+    "sigmask"
   ],
   "ignoreWords": [],
   "import": []
