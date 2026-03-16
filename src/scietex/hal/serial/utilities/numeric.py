@@ -43,7 +43,6 @@ These functions simplify working with numeric payload across different platforms
 reducing the chance of errors due to incorrect conversions or endianness mismatches.
 """
 
-# from typing import
 from enum import Enum
 
 

@@ -65,3 +65,13 @@ from .serial_connection_implementation import (
     SerialConnectionConfig,
     ModbusSerialConnectionConfig,
 )
+
+__all__ = [
+    "SerialConnectionConfigError",
+    "SerialConnectionMinimalConfigModel",
+    "SerialConnectionConfigModel",
+    "ModbusSerialConnectionConfigModel",
+    "SerialConnectionMinimalConfig",
+    "SerialConnectionConfig",
+    "ModbusSerialConnectionConfig",
+]

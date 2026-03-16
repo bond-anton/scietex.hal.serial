@@ -70,6 +70,12 @@ class RS485Client:
         custom_response (Optional[list[type[ModbusPDU]]], optional):
             A list of custom Modbus PDU response types to be registered with the client.
             Defaults to None.
+        chunk_size (int | None, optional): if defined and greater than zero defines the chunk
+            size limit, in which registers will be read or written. Defaults to None
+            (read or write all at once, no limit).
+        write_chunk_size (int | None, optional): if defined and greater than zero defines the chunk
+            size limit, in which registers will be written. Defaults to None (use chunk_size value).
+            If set to zero ignores chunk size and remove the write limit.
         logger (Optional[Logger], optional):
             A logger instance for logging client activities. If not provided, a default logger
             is used.
@@ -96,6 +102,8 @@ class RS485Client:
         custom_framer: Optional[type[FramerBase]] = None,
         custom_decoder: Optional[type[DecodePDU]] = None,
         custom_response: Optional[list[type[ModbusPDU]]] = None,
+        chunk_size: int | None = None,
+        write_chunk_size: int | None = None,
         logger: Optional[Logger] = None,
     ):
         self._con_params: (
@@ -115,6 +123,12 @@ class RS485Client:
         )
 
         self.address: int = address
+        self.__read_chunk_size: int = 0
+        if chunk_size is not None:
+            self.__read_chunk_size = max(0, chunk_size)
+        self.__write_chunk_size: int = self.__read_chunk_size
+        if write_chunk_size is not None:
+            self.__write_chunk_size = max(0, write_chunk_size)
         self.logger: Logger
         if logger is None:
             self.logger = getLogger()
@@ -213,6 +227,7 @@ class RS485Client:
             count=count,
             device_id=self.address,
             holding=holding,
+            max_count=self.__read_chunk_size,
             logger=self.logger,
         )
         if response is not None:
@@ -286,6 +301,7 @@ class RS485Client:
             register=start_register,
             value=_values,
             device_id=self.address,
+            max_count=self.__write_chunk_size,
             logger=self.logger,
             no_response_expected=no_response_expected,
         )
@@ -548,6 +564,7 @@ class RS485Client:
             register=start_register,
             value=[value_a, value_b],
             device_id=self.address,
+            max_count=self.__write_chunk_size,
             logger=self.logger,
             no_response_expected=no_response_expected,
         )

@@ -30,8 +30,6 @@ These constants aim to simplify the process of configuring serial connections by
 defaults based on industry standards.
 """
 
-from typing import Optional
-
 # Baud Rate Defaults
 DEFAULT_BAUDRATE: int = 9600
 DEFAULT_BAUDRATE_LIST: tuple[int, ...] = (
@@ -61,7 +59,7 @@ DEFAULT_STOPBITS: int = 1
 DEFAULT_STOPBITS_LIST: tuple[int, float, int] = (1, 1.5, 2)
 
 # Timeout Defaults
-DEFAULT_TIMEOUT: Optional[float] = None
+DEFAULT_TIMEOUT: float | None = None
 
 # Framer Defaults
 DEFAULT_FRAMER: str = "RTU"

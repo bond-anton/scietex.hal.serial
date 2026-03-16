@@ -329,12 +329,13 @@ def forward_data(
             level=logging.DEBUG,
         )
     # pylint: disable=too-many-nested-blocks
+
     for key, events in selector.select(timeout=1):
         key_fd = key.fileobj
         if events & EVENT_READ and isinstance(key_fd, int):
             try:
                 data = master_files[key_fd].read()
-                _logger.debug("VSN: Worker: Received data from fd %s: %s", key_fd, data)
+                # _logger.debug("VSN: Worker: Received data from fd %s: %s", key_fd, data)
                 if data_logger and isinstance(data_logger, Logger):
                     master_cache[key_fd] += data
                     key_fd_name = None

@@ -17,7 +17,7 @@ The `VirtualSerialPair` class simplifies the setup of a virtual serial environme
 easier to simulate and test serial communication without requiring physical hardware.
 """
 
-from typing import Optional, Callable
+from typing import Callable
 from logging import Logger
 
 from .virtual_serial_network import VirtualSerialNetwork
@@ -51,19 +51,19 @@ class VirtualSerialPair(VirtualSerialNetwork):
         >>> vsp.start()
     """
 
-    def __init__(self, logger: Optional[Logger] = None) -> None:
+    def __init__(self, logger: Logger | None = None) -> None:
         """
         Initialize the VirtualSerialPair instance.
 
         Args:
-            logger (Optional[Logger], optional): A logging handler for recording operational
+            logger (Logger | None, optional): A logging handler for recording operational
                 information. Defaults to a basic logger if none is provided.
         """
         super().__init__(
             virtual_ports_num=2, external_ports=None, loopback=False, logger=logger
         )
 
-    def start(self, openpty_func: Optional[Callable] = None):
+    def start(self, openpty_func: Callable | None = None):
         """
         Start the virtual serial pair.
 
@@ -72,7 +72,7 @@ class VirtualSerialPair(VirtualSerialNetwork):
         immediately.
 
         Args:
-            openpty_func (Optional[Callable], optional): An alternative function for opening
+            openpty_func (Callable | None, optional): An alternative function for opening
                 pseudo-terminal pairs. Defaults to `pty.openpty`.
 
         Raises:

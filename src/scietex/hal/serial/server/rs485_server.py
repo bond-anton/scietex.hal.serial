@@ -24,7 +24,6 @@ industrial automation and IoT applications that require scalable and reliable co
 over RS485 interfaces.
 """
 
-from typing import Optional
 import asyncio
 from logging import Logger, getLogger
 
@@ -71,7 +70,7 @@ class RS485Server:
         con_params (SerialConnectionConfigModel | ModbusSerialConnectionConfigModel):
             Connection parameters for the server.
         logger (Logger): Logging handler for recording operational information.
-        server (Optional[ModbusSerialServer]): Underlying ModbusSerialServer instance.
+        server (ModbusSerialServer | None, optional): Underlying ModbusSerialServer instance.
 
     Methods:
         - start(self): Starts the server and begins listening for incoming Modbus requests.
@@ -85,11 +84,11 @@ class RS485Server:
     def __init__(
         self,
         con_params: SerialConnectionConfigModel | ModbusSerialConnectionConfigModel,
-        devices: Optional[dict[int, ModbusDeviceContext]] = None,
-        custom_pdu: Optional[list[type[ModbusPDU]]] = None,
-        custom_framer: Optional[type[FramerBase]] = None,
-        custom_decoder: Optional[type[DecodePDU]] = None,
-        logger: Optional[Logger] = None,
+        devices: dict[int, ModbusDeviceContext] | None = None,
+        custom_pdu: list[type[ModbusPDU]] | None = None,
+        custom_framer: type[FramerBase] | None = None,
+        custom_decoder: type[DecodePDU] | None = None,
+        logger: Logger | None = None,
     ):
         """
         Initialize the RS485Server instance.
@@ -97,20 +96,20 @@ class RS485Server:
         Args:
             con_params (SerialConnectionConfigModel | ModbusSerialConnectionConfigModel):
                 Connection parameters for the server, such as port, baudrate, etc.
-            devices (Optional[Dict[int, ModbusDeviceContext]], optional): Mapping of device_id IDs
+            devices (Dict[int, ModbusDeviceContext] | None, optional): Mapping of device_id IDs
                 to their respective ModbusDeviceContext objects. Defaults to a single device_id
                 with predefined values.
             custom_pdu (list[type[ModbusPDU]]): Custom modbus protocol PDU list.
             custom_framer(type[FramerBase], optional): Custom protocol framer.
             custom_decoder (type[DecodePDU], optional): Custom PDU decoder for non-standard
                 framers.
-            logger (Optional[Logger], optional): Logging handler for recording operational
+            logger (Logger | None, optional): Logging handler for recording operational
                 information. Defaults to a basic logger if none is provided.
         """
         self.devices: dict[int, ModbusDeviceContext] = {}
-        self.custom_pdu: Optional[list[type[ModbusPDU]]] = custom_pdu
-        self.custom_framer: Optional[type[FramerBase]] = custom_framer
-        self.custom_decoder: Optional[type[DecodePDU]] = custom_decoder
+        self.custom_pdu: list[type[ModbusPDU]] | None = custom_pdu
+        self.custom_framer: type[FramerBase] | None = custom_framer
+        self.custom_decoder: type[DecodePDU] | None = custom_decoder
         if devices is not None:
             if not isinstance(devices, dict):
                 raise TypeError(
@@ -137,8 +136,8 @@ class RS485Server:
             SerialConnectionConfigModel | ModbusSerialConnectionConfigModel
         ) = con_params
         self.logger: Logger = logger if isinstance(logger, Logger) else getLogger()
-        self._task: Optional[asyncio.Task] = None
-        self.server: Optional[ModbusSerialServer] = None
+        self._task: asyncio.Task | None = None
+        self.server: ModbusSerialServer | None = None
 
     async def start(self):
         """

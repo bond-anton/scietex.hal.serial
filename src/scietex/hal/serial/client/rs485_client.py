@@ -14,7 +14,7 @@ This module simplifies interaction with Modbus devices over RS485, making it eas
 with industrial automation systems and IoT applications.
 """
 
-from typing import Optional, Any
+from typing import Any
 from logging import Logger, getLogger
 
 from pymodbus.pdu import ModbusPDU, DecodePDU
@@ -63,14 +63,20 @@ class RS485Client:
             The device_id address of the Modbus device. Defaults to 1.
         label (str, optional):
             A label for the client, used for logging and identification. Defaults to "RS485 Device".
-        custom_framer (Optional[type[FramerBase]], optional):
+        custom_framer (type[FramerBase] | None, optional):
             A custom framer class for handling Modbus message framing. Defaults to None.
-        custom_decoder (Optional[type[DecodePDU]], optional):
+        custom_decoder (type[DecodePDU] | None, optional):
             A custom decoder class for decoding Modbus Protocol Data Units (PDUs). Defaults to None.
-        custom_response (Optional[list[type[ModbusPDU]]], optional):
+        custom_response (list[type[ModbusPDU]] | None, optional):
             A list of custom Modbus PDU response types to be registered with the client.
             Defaults to None.
-        logger (Optional[Logger], optional):
+        chunk_size (int | None, optional): if defined and greater than zero defines the chunk
+            size limit, in which registers will be read or written. Defaults to None
+            (read or write all at once, no limit).
+        write_chunk_size (int | None, optional): if defined and greater than zero defines the chunk
+            size limit, in which registers will be written. Defaults to None (use chunk_size value).
+            If set to zero ignores chunk size and remove the write limit.
+        logger (Logger | None, optional):
             A logger instance for logging client activities. If not provided, a default logger
             is used.
 
@@ -93,10 +99,12 @@ class RS485Client:
         con_params: SerialConnectionConfigModel | ModbusSerialConnectionConfigModel,
         address: int = 1,
         label: str = "RS485 Device",
-        custom_framer: Optional[type[FramerBase]] = None,
-        custom_decoder: Optional[type[DecodePDU]] = None,
-        custom_response: Optional[list[type[ModbusPDU]]] = None,
-        logger: Optional[Logger] = None,
+        custom_framer: type[FramerBase] | None = None,
+        custom_decoder: type[DecodePDU] | None = None,
+        custom_response: list[type[ModbusPDU]] | None = None,
+        chunk_size: int | None = None,
+        write_chunk_size: int | None = None,
+        logger: Logger | None = None,
     ):
         self._con_params: (
             SerialConnectionConfigModel | ModbusSerialConnectionConfigModel
@@ -115,6 +123,12 @@ class RS485Client:
         )
 
         self.address: int = address
+        self.__read_chunk_size: int = 0
+        if chunk_size is not None:
+            self.__read_chunk_size = max(0, chunk_size)
+        self.__write_chunk_size: int = self.__read_chunk_size
+        if write_chunk_size is not None:
+            self.__write_chunk_size = max(0, write_chunk_size)
         self.logger: Logger
         if logger is None:
             self.logger = getLogger()
@@ -162,7 +176,7 @@ class RS485Client:
 
     async def execute(
         self, request: ModbusPDU, no_response_expected: bool = False
-    ) -> Optional[ModbusPDU]:
+    ) -> ModbusPDU | None:
         """
         Execute a Modbus request asynchronously.
 
@@ -173,7 +187,7 @@ class RS485Client:
                 If True, indicates that no response is expected from the device. Defaults to False.
 
         Returns:
-            Optional[ModbusPDU]:
+            ModbusPDU | None:
                 The response from the device as a Modbus PDU. Returns None if an error occurs or
                 no response is expected.
         """
@@ -187,7 +201,7 @@ class RS485Client:
         count: int = 1,
         holding: bool = True,
         signed: bool = False,
-    ) -> Optional[list[int]]:
+    ) -> list[int] | None:
         """
         Read payload from Modbus registers.
 
@@ -213,6 +227,7 @@ class RS485Client:
             count=count,
             device_id=self.address,
             holding=holding,
+            max_count=self.__read_chunk_size,
             logger=self.logger,
         )
         if response is not None:
@@ -224,7 +239,7 @@ class RS485Client:
 
     async def read_register(
         self, register: int, holding: bool = True, signed: bool = False
-    ) -> Optional[int]:
+    ) -> int | None:
         """
         Read payload from a single Modbus register.
 
@@ -238,11 +253,11 @@ class RS485Client:
                 If True, interprets the register value as a signed integer. Defaults to False.
 
         Returns:
-            Optional[int]:
+            int | None:
                 The register value as an integer. Returns None if an error occurs or the response
                 is invalid.
         """
-        response: Optional[list[int]] = await self.read_registers(
+        response: list[int] | None = await self.read_registers(
             register, count=1, holding=holding
         )
         if response:
@@ -257,9 +272,9 @@ class RS485Client:
         values: list[int],
         signed: bool = False,
         no_response_expected: bool = False,
-    ) -> Optional[list[int]]:
+    ) -> list[int] | None:
         """
-        Write payload to a single Modbus register.
+        Write payload to Modbus registers.
 
         Args:
             start_register (int):
@@ -272,7 +287,7 @@ class RS485Client:
                 If True, do not wait for the device_id response. Defaults to False.
 
         Returns:
-            Optional[int]:
+            list[int] | None:
                 The written register value as an integer. Returns None if an error occurs or the
                 response is invalid.
         """
@@ -286,6 +301,7 @@ class RS485Client:
             register=start_register,
             value=_values,
             device_id=self.address,
+            max_count=self.__write_chunk_size,
             logger=self.logger,
             no_response_expected=no_response_expected,
         )
@@ -306,7 +322,7 @@ class RS485Client:
         value: int,
         signed: bool = False,
         no_response_expected: bool = False,
-    ) -> Optional[int]:
+    ) -> int | None:
         """
         Write payload to a single Modbus register.
 
@@ -321,7 +337,7 @@ class RS485Client:
                 If True, do not wait for the device_id response. Defaults to False.
 
         Returns:
-            Optional[int]:
+            int | None:
                 The written register value as an integer. Returns None if an error occurs or the
                 response is invalid.
         """
@@ -352,7 +368,7 @@ class RS485Client:
         factor: int = 100,
         signed: bool = False,
         holding: bool = True,
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Read and parse a float value from a single Modbus register.
 
@@ -370,10 +386,10 @@ class RS485Client:
                 Defaults to True.
 
         Returns:
-            Optional[float]:
+            float | None:
                 The parsed float value. Returns None if an error occurs or the response is invalid.
         """
-        response: Optional[int] = await self.read_register(
+        response: int | None = await self.read_register(
             register, holding=holding, signed=signed
         )
         if response:
@@ -387,7 +403,7 @@ class RS485Client:
         factor: int = 100,
         signed: bool = False,
         no_response_expected: bool = False,
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Write a float value to a single Modbus register.
 
@@ -406,11 +422,11 @@ class RS485Client:
                 If True, do not wait for the device_id response. Defaults to False.
 
         Returns:
-            Optional[float]:
+            float | None:
                 The written float value. Returns None if an error occurs or the response is
                 invalid.
         """
-        response: Optional[int] = await self.write_register(
+        response: int | None = await self.write_register(
             register,
             float_to_unsigned16(value, factor),
             signed=False,
@@ -430,7 +446,7 @@ class RS485Client:
         holding: bool = True,
         byteorder: ByteOrder = ByteOrder.LITTLE_ENDIAN,
         signed: bool = False,
-    ) -> Optional[int]:
+    ) -> int | None:
         """
         Read and parse a 32-bit integer value from two Modbus registers.
 
@@ -447,11 +463,11 @@ class RS485Client:
                 If True, interprets the value as a signed integer. Defaults to False.
 
         Returns:
-            Optional[int]:
+            int | None:
                 The parsed 32-bit integer value. Returns None if an error occurs or the response
                 is invalid.
         """
-        response: Optional[list[int]] = await self.read_registers(
+        response: list[int] | None = await self.read_registers(
             start_register, count=2, holding=holding
         )
         if response and len(response) == 2:
@@ -470,7 +486,7 @@ class RS485Client:
         holding: bool = True,
         byteorder: ByteOrder = ByteOrder.LITTLE_ENDIAN,
         signed: bool = False,
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Read and parse a float value from two Modbus registers.
 
@@ -493,7 +509,7 @@ class RS485Client:
                 If True, interprets the value as a signed integer. Defaults to False.
 
         Returns:
-            Optional[float]:
+            float | None:
                 The parsed float value. Returns None if an error occurs or the response is invalid.
 
         Raises:
@@ -501,7 +517,7 @@ class RS485Client:
         """
         if factor == 0:
             raise ValueError("Factor cannot be zero.")
-        response: Optional[int] = await self.read_two_registers_int(
+        response: int | None = await self.read_two_registers_int(
             start_register, holding=holding, byteorder=byteorder, signed=signed
         )
         if response is not None:
@@ -516,7 +532,7 @@ class RS485Client:
         byteorder: ByteOrder = ByteOrder.LITTLE_ENDIAN,
         signed: bool = False,
         no_response_expected: bool = False,
-    ) -> Optional[int]:
+    ) -> int | None:
         """
         Write a 32-bit integer value to two Modbus registers.
 
@@ -534,7 +550,7 @@ class RS485Client:
                 If True, do not wait for the device_id response. Defaults to False.
 
         Returns:
-            Optional[int]:
+            int | None:
                 The written 32-bit integer value. Returns None if an error occurs or the response
                 is invalid.
         """
@@ -548,6 +564,7 @@ class RS485Client:
             register=start_register,
             value=[value_a, value_b],
             device_id=self.address,
+            max_count=self.__write_chunk_size,
             logger=self.logger,
             no_response_expected=no_response_expected,
         )
@@ -573,7 +590,7 @@ class RS485Client:
         byteorder: ByteOrder = ByteOrder.LITTLE_ENDIAN,
         signed: bool = False,
         no_response_expected: bool = False,
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Write a float value to two Modbus registers.
 
@@ -596,7 +613,7 @@ class RS485Client:
                 If True, do not wait for the device_id response. Defaults to False.
 
         Returns:
-            Optional[float]:
+            float | None:
                 The written float value. Returns None if an error occurs or the response is
                 invalid.
 
@@ -604,7 +621,7 @@ class RS485Client:
             ValueError: If `factor` is zero.
         """
         value_int: int = int(round(value * factor))
-        response: Optional[int] = await self.write_two_registers(
+        response: int | None = await self.write_two_registers(
             start_register,
             value_int,
             byteorder,

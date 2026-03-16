@@ -31,8 +31,6 @@ By centralizing validation logic here, we ensure consistent enforcement of const
 configurations.
 """
 
-from typing import Optional
-
 from .exceptions import SerialConnectionConfigError
 from .defaults import (
     DEFAULT_BAUDRATE,
@@ -49,7 +47,7 @@ from .defaults import (
 )
 
 
-def validate_port(port: Optional[str]) -> str:
+def validate_port(port: str | None) -> str:
     """
     Validate the port value.
 
@@ -73,7 +71,7 @@ def validate_port(port: Optional[str]) -> str:
     return port
 
 
-def validate_baudrate(baudrate: Optional[int]) -> int:
+def validate_baudrate(baudrate: int | None) -> int:
     """
     Validate the baudrate value.
 
@@ -97,7 +95,7 @@ def validate_baudrate(baudrate: Optional[int]) -> int:
     return baudrate
 
 
-def validate_bytesize(bytesize: Optional[int]) -> int:
+def validate_bytesize(bytesize: int | None) -> int:
     """
     Validate the bytesize value.
 
@@ -121,7 +119,7 @@ def validate_bytesize(bytesize: Optional[int]) -> int:
     return bytesize
 
 
-def validate_parity(parity: Optional[str]) -> str:
+def validate_parity(parity: str | None) -> str:
     """
     Validate the parity value.
 
@@ -144,7 +142,7 @@ def validate_parity(parity: Optional[str]) -> str:
     return parity
 
 
-def validate_stopbits(stopbits: Optional[int | float]) -> int | float:
+def validate_stopbits(stopbits: int | float | None) -> int | float:
     """
     Validate the stopbits value.
 
@@ -167,17 +165,17 @@ def validate_stopbits(stopbits: Optional[int | float]) -> int | float:
     return stopbits
 
 
-def validate_timeout(timeout: Optional[float]) -> Optional[float]:
+def validate_timeout(timeout: float | None) -> float | None:
     """
     Validate the timeout value.
 
     Ensures that the timeout is a non-negative float or None.
 
     Args:
-        timeout (Optional[float]): Timeout value to validate.
+        timeout (float | None, optional): Timeout value to validate.
 
     Returns:
-        Optional[float]: Validated timeout.
+        float | None: Validated timeout.
     """
     if timeout is None:
         return DEFAULT_TIMEOUT
@@ -190,7 +188,7 @@ def validate_timeout(timeout: Optional[float]) -> Optional[float]:
     return float(timeout)
 
 
-def validate_framer(framer: Optional[str]) -> str:
+def validate_framer(framer: str | None) -> str:
     """
     Validate the framer value.
 

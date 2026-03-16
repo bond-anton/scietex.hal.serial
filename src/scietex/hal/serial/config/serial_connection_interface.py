@@ -29,7 +29,6 @@ Usage:
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional
 
 
 class SerialConnectionMinimalConfigModel(ABC):
@@ -175,9 +174,10 @@ class SerialConnectionConfigModel(SerialConnectionMinimalConfigModel):
         bytesize (int): The number of payload bits.
         parity (str): The parity setting for the communication.
         stopbits (int | float): The number of stop bits used in the communication.
-        timeout (Optional[float]): The timeout for the serial connection in seconds.
-        write_timeout (Optional[float]): The write timeout for the serial connection in seconds.
-        inter_byte_timeout (Optional[float]): The timeout between bytes during transmission.
+        timeout (float | None, optional): The timeout for the serial connection in seconds.
+        write_timeout (float | None, optional): The write timeout for the serial connection
+            in seconds.
+        inter_byte_timeout (float | None, optional): The timeout between bytes during transmission.
 
     Methods:
         to_dict() -> dict: Converts the serial connection config to a dictionary.
@@ -185,62 +185,62 @@ class SerialConnectionConfigModel(SerialConnectionMinimalConfigModel):
 
     @property
     @abstractmethod
-    def timeout(self) -> Optional[float]:
+    def timeout(self) -> float | None:
         """
         Gets the timeout value for the serial connection.
 
         Returns:
-            Optional[float]: The timeout value in seconds, or None if no timeout is set.
+            float | None: The timeout value in seconds, or None if no timeout is set.
         """
 
     @timeout.setter
     @abstractmethod
-    def timeout(self, value: Optional[float]) -> None:
+    def timeout(self, value: float | None) -> None:
         """
         Sets the timeout value for the serial connection.
 
         Args:
-            value (Optional[float]): Timeout value in seconds, or None to disable the timeout.
+            value (float | None): Timeout value in seconds, or None to disable the timeout.
         """
 
     @property
     @abstractmethod
-    def write_timeout(self) -> Optional[float]:
+    def write_timeout(self) -> float | None:
         """
         Gets the write timeout value for the serial connection.
 
         Returns:
-            Optional[float]: The write timeout value in seconds, or None if no timeout is set.
+            float | None: The write timeout value in seconds, or None if no timeout is set.
         """
 
     @write_timeout.setter
     @abstractmethod
-    def write_timeout(self, value: Optional[float]) -> None:
+    def write_timeout(self, value: float | None) -> None:
         """
         Sets the write timeout value for the serial connection.
 
         Args:
-            value (Optional[float]): Write timeout value in seconds, or None to disable timeout.
+            value (float | None): Write timeout value in seconds, or None to disable timeout.
         """
 
     @property
     @abstractmethod
-    def inter_byte_timeout(self) -> Optional[float]:
+    def inter_byte_timeout(self) -> float | None:
         """
         Gets the inter-byte timeout value for the serial connection.
 
         Returns:
-            Optional[float]: Inter-byte timeout value in seconds, or None if no timeout is set.
+            float | None: Inter-byte timeout value in seconds, or None if no timeout is set.
         """
 
     @inter_byte_timeout.setter
     @abstractmethod
-    def inter_byte_timeout(self, value: Optional[float]) -> None:
+    def inter_byte_timeout(self, value: float | None) -> None:
         """
         Sets the inter-byte timeout value for the serial connection.
 
         Args:
-            value (Optional[float]): Inter-byte timeout in seconds, None to disable timeout.
+            value (float | None): Inter-byte timeout in seconds, None to disable timeout.
         """
 
 
@@ -257,7 +257,7 @@ class ModbusSerialConnectionConfigModel(SerialConnectionMinimalConfigModel):
         bytesize (int): The number of payload bits.
         parity (str): The parity setting for the communication.
         stopbits (int | float): The number of stop bits used in the communication.
-        timeout (Optional[float]): The timeout for the serial connection in seconds.
+        timeout (float | None, optional): The timeout for the serial connection in seconds.
         framer (str): The Modbus framer type (e.g., "RTU", "ASCII").
 
     Methods:
@@ -266,22 +266,22 @@ class ModbusSerialConnectionConfigModel(SerialConnectionMinimalConfigModel):
 
     @property
     @abstractmethod
-    def timeout(self) -> Optional[float]:
+    def timeout(self) -> float | None:
         """
         Gets the timeout value for the serial connection.
 
         Returns:
-            Optional[float]: The timeout value in seconds, or None if no timeout is set.
+            float | None: The timeout value in seconds, or None if no timeout is set.
         """
 
     @timeout.setter
     @abstractmethod
-    def timeout(self, value: Optional[float]) -> None:
+    def timeout(self, value: float | None) -> None:
         """
         Sets the timeout value for the serial connection.
 
         Args:
-            value (Optional[float]): Timeout value in seconds, or None to disable the timeout.
+            value (float | None): Timeout value in seconds, or None to disable the timeout.
         """
 
     @property

@@ -43,16 +43,15 @@ Attributes:
     - bytesize (int): The number of payload bits.
     - parity (str): The parity setting for the communication.
     - stopbits (int | float): The number of stop bits used in the communication.
-    - timeout (Optional[float]): The timeout for the serial connection in seconds.
-    - write_timeout (Optional[float]): The write timeout for the serial connection in seconds.
-    - inter_byte_timeout (Optional[float]): The timeout between bytes during transmission.
+    - timeout (float | None, optional): The timeout for the serial connection in seconds.
+    - write_timeout (float | None, optional): The write timeout for the serial connection
+        in seconds.
+    - inter_byte_timeout (float | None, optional): The timeout between bytes during transmission.
     - framer (str): The Modbus framer type (e.g., "RTU", "ASCII").
 
 Methods:
     - to_dict() -> dict: Converts the serial connection config to a dictionary.
 """
-
-from typing import Optional
 
 from .serial_connection_interface import (
     SerialConnectionMinimalConfigModel,
@@ -103,11 +102,11 @@ class SerialConnectionMinimalConfig(SerialConnectionMinimalConfigModel):
     # pylint: disable=too-many-arguments, too-many-positional-arguments
     def __init__(
         self,
-        port: Optional[str] = None,
-        baudrate: Optional[int] = None,
-        bytesize: Optional[int] = None,
-        parity: Optional[str] = None,
-        stopbits: Optional[int | float] = None,
+        port: str | None = None,
+        baudrate: int | None = None,
+        bytesize: int | None = None,
+        parity: str | None = None,
+        stopbits: int | float | None = None,
         **kwargs,
     ) -> None:
         self._port: str = validate_port(port)
@@ -264,9 +263,11 @@ class SerialConnectionConfig(
         bytesize (int): The number of payload bits.
         parity (str): The parity setting for the communication.
         stopbits (int | float): The number of stop bits used in the communication.
-        timeout (Optional[float]): The timeout for the serial connection in seconds.
-        write_timeout (Optional[float]): The write timeout for the serial connection in seconds.
-        inter_byte_timeout (Optional[float]): The timeout between bytes during transmission.
+        timeout (float | None, optional): The timeout for the serial connection in seconds.
+        write_timeout (float | None, optional): The write timeout for the serial connection
+            in seconds.
+        inter_byte_timeout (float | None, optional): The timeout between bytes during
+            transmission.
 
     Methods:
         to_dict() -> dict: Converts the serial connection config to a dictionary.
@@ -275,14 +276,14 @@ class SerialConnectionConfig(
     # pylint: disable=too-many-arguments, too-many-positional-arguments
     def __init__(
         self,
-        port: Optional[str] = None,
-        baudrate: Optional[int] = None,
-        bytesize: Optional[int] = None,
-        parity: Optional[str] = None,
-        stopbits: Optional[int | float] = None,
-        timeout: Optional[float] = None,
-        write_timeout: Optional[float] = None,
-        inter_byte_timeout: Optional[float] = None,
+        port: str | None = None,
+        baudrate: int | None = None,
+        bytesize: int | None = None,
+        parity: str | None = None,
+        stopbits: int | float | None = None,
+        timeout: float | None = None,
+        write_timeout: float | None = None,
+        inter_byte_timeout: float | None = None,
         **kwargs,
     ) -> None:
         super().__init__(port, baudrate, bytesize, parity, stopbits, **kwargs)
@@ -291,45 +292,46 @@ class SerialConnectionConfig(
         self._inter_byte_timeout = validate_timeout(inter_byte_timeout)
 
     @property
-    def timeout(self) -> Optional[float]:
+    def timeout(self) -> float | None:
         """
         The timeout value for the serial connection.
 
         Returns:
-            value (Optional[float]): Timeout value in seconds, or None to disable the timeout.
+            value (float | None, optional): Timeout value in seconds, or None
+                to disable the timeout.
         """
         return self._timeout
 
     @timeout.setter
-    def timeout(self, value: Optional[float]) -> None:
+    def timeout(self, value: float | None) -> None:
         self._timeout = validate_timeout(value)
 
     @property
-    def write_timeout(self) -> Optional[float]:
+    def write_timeout(self) -> float | None:
         """
         The write timeout value for the serial connection.
 
         Returns:
-            Optional[float]: The write timeout value in seconds, or None if no timeout is set.
+            float | None: The write timeout value in seconds, or None if no timeout is set.
         """
         return self._write_timeout
 
     @write_timeout.setter
-    def write_timeout(self, value: Optional[float]) -> None:
+    def write_timeout(self, value: float | None) -> None:
         self._write_timeout = validate_timeout(value)
 
     @property
-    def inter_byte_timeout(self) -> Optional[float]:
+    def inter_byte_timeout(self) -> float | None:
         """
         The inter-byte timeout value for the serial connection.
 
         Returns:
-            Optional[float]: Inter-byte timeout value in seconds, or None if no timeout is set.
+            float | None: Inter-byte timeout value in seconds, or None if no timeout is set.
         """
         return self._inter_byte_timeout
 
     @inter_byte_timeout.setter
-    def inter_byte_timeout(self, value: Optional[float]) -> None:
+    def inter_byte_timeout(self, value: float | None) -> None:
         self._inter_byte_timeout = validate_timeout(value)
 
     def to_dict(self) -> dict:
@@ -403,7 +405,7 @@ class ModbusSerialConnectionConfig(
         bytesize (int): The number of payload bits.
         parity (str): The parity setting for the communication.
         stopbits (int | float): The number of stop bits used in the communication.
-        timeout (Optional[float]): The timeout for the serial connection in seconds.
+        timeout (float | None, optional): The timeout for the serial connection in seconds.
         framer (str): The Modbus framer type (e.g., "RTU", "ASCII").
 
     Methods:
@@ -413,13 +415,13 @@ class ModbusSerialConnectionConfig(
     # pylint: disable=too-many-arguments, too-many-positional-arguments
     def __init__(
         self,
-        port: Optional[str] = None,
-        baudrate: Optional[int] = None,
-        bytesize: Optional[int] = None,
-        parity: Optional[str] = None,
-        stopbits: Optional[int | float] = None,
-        timeout: Optional[float] = None,
-        framer: Optional[str] = None,
+        port: str | None = None,
+        baudrate: int | None = None,
+        bytesize: int | None = None,
+        parity: str | None = None,
+        stopbits: int | float | None = None,
+        timeout: float | None = None,
+        framer: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(port, baudrate, bytesize, parity, stopbits, **kwargs)
@@ -427,17 +429,17 @@ class ModbusSerialConnectionConfig(
         self._framer = validate_framer(framer)
 
     @property
-    def timeout(self) -> Optional[float]:
+    def timeout(self) -> float | None:
         """
         The timeout value for the serial connection.
 
         Returns:
-            value (Optional[float]): Timeout value in seconds, or None to disable the timeout.
+            value (float | None): Timeout value in seconds, or None to disable the timeout.
         """
         return self._timeout
 
     @timeout.setter
-    def timeout(self, value: Optional[float]) -> None:
+    def timeout(self, value: float | None) -> None:
         self._timeout = validate_timeout(value)
 
     @property

@@ -219,13 +219,14 @@ async def modbus_execute(
     return response
 
 
-# pylint: disable=too-many-arguments, too-many-positional-arguments
+# pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-branches
 async def modbus_read_registers(
     client: AsyncModbusSerialClient,
     start_register: int = 0,
     count: int = 1,
     device_id: int = 1,
     holding: bool = True,
+    max_count: int = 0,
     logger: Optional[logging.Logger] = None,
 ) -> Optional[list[int]]:
     """
@@ -247,6 +248,8 @@ async def modbus_read_registers(
             The device_id ID of the Modbus device. Defaults to 1.
         holding (bool, optional):
             If True, reads holding registers. If False, reads input registers. Defaults to True.
+        max_count (int, optional):If greater than zero it determines max chunk size, in which
+            registers will be read. Defaults to zero (read all at once).
         logger (logging.Logger, optional):
             An optional logger instance for logging errors and exceptions. If not provided,
             no logging is performed.
@@ -272,14 +275,25 @@ async def modbus_read_registers(
     if not client.connected:
         return None
     try:
-        if holding:
-            response = await client.read_holding_registers(
-                start_register, count=count, device_id=device_id
-            )
-        else:
-            response = await client.read_input_registers(
-                start_register, count=count, device_id=device_id
-            )
+        responses: list[ModbusPDU] = []
+        current_start: int = start_register
+        registers_read: int = 0
+        while registers_read < count:
+            if max_count < 1:
+                chunk_size = count
+            else:
+                chunk_size = min(max_count, count - registers_read)
+            if holding:
+                response = await client.read_holding_registers(
+                    current_start, count=chunk_size, device_id=device_id
+                )
+            else:
+                response = await client.read_input_registers(
+                    current_start, count=chunk_size, device_id=device_id
+                )
+            responses.append(response)
+            registers_read += chunk_size
+            current_start += chunk_size
     except ModbusException as e:
         if logger:
             logger.error(
@@ -290,16 +304,20 @@ async def modbus_read_registers(
         return None
     finally:
         client.close()
-    if response.isError():
-        if logger:
-            logger.error(
-                "%s: Received exception from device (%s)",
-                client.comm_params.comm_name,
-                response,
-            )
-        return None
-    if hasattr(response, "registers"):
-        return response.registers
+    registers: list[int] = []
+    for response in responses:
+        if response.isError():
+            if logger:
+                logger.error(
+                    "%s: Received exception from device (%s)",
+                    client.comm_params.comm_name,
+                    response,
+                )
+            return None
+        if hasattr(response, "registers"):
+            registers += response.registers
+    if registers:
+        return registers
     return None
 
 
@@ -309,6 +327,7 @@ async def modbus_read_input_registers(
     start_register: int = 0,
     count: int = 1,
     device_id: int = 1,
+    max_count: int = 0,
     logger: Optional[logging.Logger] = None,
 ) -> Optional[list[int]]:
     """
@@ -327,6 +346,8 @@ async def modbus_read_input_registers(
             The number of input registers to read. Defaults to 1.
         device_id (int, optional):
             The device_id ID of the Modbus device. Defaults to 1.
+        max_count (int, optional):If greater than zero it determines max chunk size, in which
+            registers will be read. Defaults to zero (read all at once).
         logger (logging.Logger, optional):
             An optional logger instance for logging debug information and errors. If not provided,
             no logging is performed.
@@ -357,6 +378,7 @@ async def modbus_read_input_registers(
         count,
         device_id,
         holding=False,
+        max_count=max_count,
         logger=logger,
     )
 
@@ -367,6 +389,7 @@ async def modbus_read_holding_registers(
     start_register: int = 0,
     count: int = 1,
     device_id: int = 1,
+    max_count: int = 0,
     logger: Optional[logging.Logger] = None,
 ) -> Optional[list[int]]:
     """
@@ -385,6 +408,8 @@ async def modbus_read_holding_registers(
             The number of holding registers to read. Defaults to 1.
         device_id (int, optional):
             The device_id ID of the Modbus device. Defaults to 1.
+        max_count (int, optional):If greater than zero it determines max chunk size, in which
+            registers will be read. Defaults to zero (read all at once).
         logger (logging.Logger, optional):
             An optional logger instance for logging debug information and errors. If not provided,
             no logging is performed.
@@ -415,16 +440,18 @@ async def modbus_read_holding_registers(
         count,
         device_id,
         holding=True,
+        max_count=max_count,
         logger=logger,
     )
 
 
-# pylint: disable=too-many-arguments, too-many-positional-arguments
+# pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-branches
 async def modbus_write_registers(
     client: AsyncModbusSerialClient,
     register: int,
     value: list[int],
     device_id: int = 1,
+    max_count: int = 0,
     logger: Optional[logging.Logger] = None,
     no_response_expected: bool = False,
 ) -> Optional[list[int]]:
@@ -445,6 +472,8 @@ async def modbus_write_registers(
             A list of values to write to the holding registers.
         device_id (int, optional):
             The device_id ID of the Modbus device. Defaults to 1.
+        max_count (int, optional):If greater than zero it determines max chunk size, in which
+            registers will be written. Defaults to zero (write all at once).
         logger (logging.Logger, optional):
             An optional logger instance for logging debug information and errors. If not provided,
             no logging is performed.
@@ -477,14 +506,25 @@ async def modbus_write_registers(
         )
     await client.connect()
     try:
-        response = await client.write_registers(
-            register,
-            value,
-            device_id=device_id,
-            no_response_expected=no_response_expected,
-        )
+        responses: list[ModbusPDU] = []
+        current_address = register
+        registers_written: int = 0
+        while registers_written < len(value):
+            if max_count < 1:
+                chunk_size = len(value)
+            else:
+                chunk_size = min(max_count, len(value) - registers_written)
+            response = await client.write_registers(
+                current_address,
+                value[registers_written : registers_written + chunk_size],
+                device_id=device_id,
+                no_response_expected=no_response_expected,
+            )
+            registers_written += chunk_size
+            current_address += chunk_size
+            if not no_response_expected:
+                responses.append(response)
     except ModbusException as e:
-        client.close()
         if not no_response_expected:
             if logger:
                 logger.error(
@@ -492,19 +532,23 @@ async def modbus_write_registers(
                     client.comm_params.comm_name,
                     e,
                 )
-        return None
-    client.close()
-    if response.isError():
-        if not no_response_expected:
-            if logger:
-                logger.error(
-                    "%s: Received exception from device (%s)",
-                    client.comm_params.comm_name,
-                    response,
-                )
-        return None
-    if hasattr(response, "registers"):
-        return response.registers
+    finally:
+        client.close()
+    registers: list[int] = []
+    for response in responses:
+        if response.isError():
+            if not no_response_expected:
+                if logger:
+                    logger.error(
+                        "%s: Received exception from device (%s)",
+                        client.comm_params.comm_name,
+                        response,
+                    )
+            return None
+        if hasattr(response, "registers"):
+            registers += response.registers
+    if registers:
+        return registers
     return None
 
 

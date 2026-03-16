@@ -1,7 +1,6 @@
 """Custom request test."""
 
 import logging
-from typing import Optional
 
 import pytest
 
@@ -98,7 +97,7 @@ class CustomDecodePDU(DecodePDU):
             int, dict[int, tuple[type[ModbusPDU], type[ModbusPDU]]]
         ] = {}
 
-    def lookupPduClass(self, data: bytes) -> Optional[type[base.ModbusPDU]]:
+    def lookupPduClass(self, data: bytes) -> type[base.ModbusPDU] | None:
         function_code = 0
         return self.pdu_table.get(function_code, (None, None))[self.pdu_inx]
 
@@ -106,7 +105,7 @@ class CustomDecodePDU(DecodePDU):
         # print(f"REGISTER: {custom_class}")
         super().register(custom_class)
 
-    def decode(self, frame: bytes) -> Optional[base.ModbusPDU]:
+    def decode(self, frame: bytes) -> base.ModbusPDU | None:
         # print(f"DECODER DECODING FRAME: {frame}, {frame.decode()}")
         try:
             function_code = 0
@@ -147,8 +146,8 @@ class CustomModbusResponse(ModbusPDU):
 
     def __init__(
         self,
-        command: Optional[str] = None,
-        data: Optional[bytes] = None,
+        command: str | None = None,
+        data: bytes | None = None,
         dev_id=1,
         transaction_id=0,
     ):
@@ -187,8 +186,8 @@ class CustomRequest(ModbusPDU):
 
     def __init__(
         self,
-        command: Optional[str] = None,
-        data: Optional[bytes] = None,
+        command: str | None = None,
+        data: bytes | None = None,
         dev_id=1,
         transaction_id=0,
     ):

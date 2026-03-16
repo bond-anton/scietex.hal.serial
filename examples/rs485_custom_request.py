@@ -6,7 +6,6 @@ This example is just to show how one can implement custom protocol using
 # pylint: disable=duplicate-code
 
 import asyncio
-from typing import Optional
 
 from pymodbus.constants import ExcCodes
 from pymodbus import ModbusException
@@ -141,7 +140,7 @@ class CustomizedDecodePDU(DecodePDU):
             int, dict[int, tuple[type[ModbusPDU], type[ModbusPDU]]]
         ] = {}
 
-    def lookupPduClass(self, data: bytes) -> Optional[type[base.ModbusPDU]]:
+    def lookupPduClass(self, data: bytes) -> type[base.ModbusPDU] | None:
         function_code = 0
         return self.pdu_table.get(function_code, (None, None))[self.pdu_inx]
 
@@ -149,7 +148,7 @@ class CustomizedDecodePDU(DecodePDU):
         print(f"REGISTER: {custom_class}")
         super().register(custom_class)
 
-    def decode(self, frame: bytes) -> Optional[base.ModbusPDU]:
+    def decode(self, frame: bytes) -> base.ModbusPDU | None:
         print(f"DECODER DECODING FRAME: {frame}, {frame.decode()}")
         try:
             function_code = 0
@@ -190,8 +189,8 @@ class CustomizedModbusResponse(ModbusPDU):
 
     def __init__(
         self,
-        command: Optional[str] = None,
-        data: Optional[bytes] = None,
+        command: str | None = None,
+        data: bytes | None = None,
         dev_id=1,
         transaction_id=0,
     ):
@@ -236,8 +235,8 @@ class CustomizedRequest(ModbusPDU):
 
     def __init__(
         self,
-        command: Optional[str] = None,
-        data: Optional[bytes] = None,
+        command: str | None = None,
+        data: bytes | None = None,
         dev_id=1,
         transaction_id=0,
     ):

@@ -14,13 +14,13 @@ Functions:
         Prepares a dictionary of parameters for establishing a Modbus connection over
         a serial interface.
     - modbus_read_registers(con_params: ..., start_register: int = 0, ...)
-        -> Union[list[int], None]: Reads payload from Modbus holding or input registers.
+        -> list[int] | None: Reads payload from Modbus holding or input registers.
     - modbus_read_input_registers(con_params: ..., start_register: int = 0, ...)
-        -> Optional[list[int]]: Reads payload specifically from Modbus input registers.
+        -> list[int] | None: Reads payload specifically from Modbus input registers.
     - modbus_read_holding_registers(con_params: ..., start_register: int = 0, ...)
-        -> Union[list[int], None]: Reads payload specifically from Modbus holding registers.
+        -> list[int] | None: Reads payload specifically from Modbus holding registers.
     - modbus_write_registers(con_params: ..., register: int, value: list[int], ...)
-        -> Union[list[int], None]: Writes payload to Modbus registers.
+        -> list[int] | None: Writes payload to Modbus registers.
 
 These functions facilitate robust and efficient Modbus communication, ensuring proper error
 handling and adherence to Modbus specifications.
@@ -29,7 +29,6 @@ This module simplifies working with Modbus by abstracting low-level details, all
 focus on higher-level tasks such as retrieving or updating device states.
 """
 
-from typing import Optional
 import logging
 from pymodbus import ModbusException, FramerType
 from pymodbus.pdu import ModbusPDU, DecodePDU
@@ -91,10 +90,10 @@ def modbus_connection_config(con_params: SerialConnectionMinimalConfigModel) -> 
 
 def modbus_get_client(
     con_params: SerialConnectionMinimalConfigModel,
-    custom_framer: Optional[type[FramerBase]] = None,
-    custom_decoder: Optional[type[DecodePDU]] = None,
-    custom_response: Optional[list[type[ModbusPDU]]] = None,
-    label: Optional[str] = None,
+    custom_framer: type[FramerBase] | None = None,
+    custom_decoder: type[DecodePDU] | None = None,
+    custom_response: list[type[ModbusPDU]] | None = None,
+    label: str | None = None,
 ) -> AsyncModbusSerialClient:
     """
     Creates and configures an asynchronous Modbus serial client with optional customizations.
@@ -107,17 +106,17 @@ def modbus_get_client(
         con_params (SerialConnectionMinimalConfigModel):
             A model containing the minimal configuration parameters required for establishing
             a serial connection.
-        custom_framer (Optional[type[FramerBase]]):
+        custom_framer (type[FramerBase] | None):
             An optional custom framer class to be used for framing Modbus messages.
             If not provided, a default framer is selected based on the `framer` parameter
             in `con_params`.
-        custom_decoder (Optional[type[DecodePDU]]):
+        custom_decoder (type[DecodePDU] | None):
             An optional custom decoder class to be used for decoding Modbus Protocol
             Data Units (PDUs). If not provided, the default `DecodePDU` is used.
-        custom_response (Optional[list[type[ModbusPDU]]]):
+        custom_response (list[type[ModbusPDU]] | None):
             An optional list of custom Modbus PDU response types to be registered with the client.
             These are used to handle specific types of Modbus responses.
-        label (Optional[str]):
+        label (str | None):
             An optional label for the client. If not provided, the default label "RS485" is used.
 
     Returns:
@@ -157,7 +156,7 @@ async def modbus_execute(
     client: AsyncModbusSerialClient,
     request: ModbusPDU,
     no_response_expected: bool = False,
-    logger: Optional[logging.Logger] = None,
+    logger: logging.Logger | None = None,
 ):
     """
     Executes a Modbus request asynchronously using the provided client and handles the response.
@@ -173,12 +172,12 @@ async def modbus_execute(
             The Modbus Protocol Data Unit (PDU) representing the request to be sent to the device.
         no_response_expected (bool, optional):
             If True, indicates that no response is expected from the device. Defaults to False.
-        logger (Optional[logging.Logger], optional):
+        logger (logging.Logger | None, optional):
             An optional logger instance for logging errors and exceptions. If not provided,
             no logging is performed.
 
     Returns:
-        Optional[ModbusPDU]:
+        ModbusPDU | None:
             The response from the Modbus device as a Modbus PDU. Returns None if an error occurs,
             no response is expected, or if the client fails to connect.
 
@@ -219,15 +218,16 @@ async def modbus_execute(
     return response
 
 
-# pylint: disable=too-many-arguments, too-many-positional-arguments
+# pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-branches
 async def modbus_read_registers(
     client: AsyncModbusSerialClient,
     start_register: int = 0,
     count: int = 1,
     device_id: int = 1,
     holding: bool = True,
-    logger: Optional[logging.Logger] = None,
-) -> Optional[list[int]]:
+    max_count: int = 0,
+    logger: logging.Logger | None = None,
+) -> list[int] | None:
     """
     Reads a sequence of Modbus registers asynchronously using the provided client.
 
@@ -247,12 +247,14 @@ async def modbus_read_registers(
             The device_id ID of the Modbus device. Defaults to 1.
         holding (bool, optional):
             If True, reads holding registers. If False, reads input registers. Defaults to True.
+        max_count (int, optional):If greater than zero it determines max chunk size, in which
+            registers will be read. Defaults to zero (read all at once).
         logger (logging.Logger, optional):
             An optional logger instance for logging errors and exceptions. If not provided,
             no logging is performed.
 
     Returns:
-        Optional[list[int]]:
+        list[int] | None:
             A list of register values if the read operation is successful. Returns None if an
             error occurs, the client fails to connect, or the response does not contain valid
             register payload.
@@ -272,14 +274,25 @@ async def modbus_read_registers(
     if not client.connected:
         return None
     try:
-        if holding:
-            response = await client.read_holding_registers(
-                start_register, count=count, device_id=device_id
-            )
-        else:
-            response = await client.read_input_registers(
-                start_register, count=count, device_id=device_id
-            )
+        responses: list[ModbusPDU] = []
+        current_start: int = start_register
+        registers_read: int = 0
+        while registers_read < count:
+            if max_count < 1:
+                chunk_size = count
+            else:
+                chunk_size = min(max_count, count - registers_read)
+            if holding:
+                response = await client.read_holding_registers(
+                    current_start, count=chunk_size, device_id=device_id
+                )
+            else:
+                response = await client.read_input_registers(
+                    current_start, count=chunk_size, device_id=device_id
+                )
+            responses.append(response)
+            registers_read += chunk_size
+            current_start += chunk_size
     except ModbusException as e:
         if logger:
             logger.error(
@@ -290,16 +303,20 @@ async def modbus_read_registers(
         return None
     finally:
         client.close()
-    if response.isError():
-        if logger:
-            logger.error(
-                "%s: Received exception from device (%s)",
-                client.comm_params.comm_name,
-                response,
-            )
-        return None
-    if hasattr(response, "registers"):
-        return response.registers
+    registers: list[int] = []
+    for response in responses:
+        if response.isError():
+            if logger:
+                logger.error(
+                    "%s: Received exception from device (%s)",
+                    client.comm_params.comm_name,
+                    response,
+                )
+            return None
+        if hasattr(response, "registers"):
+            registers += response.registers
+    if registers:
+        return registers
     return None
 
 
@@ -309,8 +326,9 @@ async def modbus_read_input_registers(
     start_register: int = 0,
     count: int = 1,
     device_id: int = 1,
-    logger: Optional[logging.Logger] = None,
-) -> Optional[list[int]]:
+    max_count: int = 0,
+    logger: logging.Logger | None = None,
+) -> list[int] | None:
     """
     Reads a sequence of Modbus input registers asynchronously using the provided client.
 
@@ -327,12 +345,14 @@ async def modbus_read_input_registers(
             The number of input registers to read. Defaults to 1.
         device_id (int, optional):
             The device_id ID of the Modbus device. Defaults to 1.
+        max_count (int, optional):If greater than zero it determines max chunk size, in which
+            registers will be read. Defaults to zero (read all at once).
         logger (logging.Logger, optional):
             An optional logger instance for logging debug information and errors. If not provided,
             no logging is performed.
 
     Returns:
-        Optional[list[int]]:
+        list[int] | None:
             A list of input register values if the read operation is successful. Returns None if an
             error occurs, the client fails to connect, or the response does not contain valid
             register payload.
@@ -357,6 +377,7 @@ async def modbus_read_input_registers(
         count,
         device_id,
         holding=False,
+        max_count=max_count,
         logger=logger,
     )
 
@@ -367,8 +388,9 @@ async def modbus_read_holding_registers(
     start_register: int = 0,
     count: int = 1,
     device_id: int = 1,
-    logger: Optional[logging.Logger] = None,
-) -> Optional[list[int]]:
+    max_count: int = 0,
+    logger: logging.Logger | None = None,
+) -> list[int] | None:
     """
     Reads a sequence of Modbus holding registers asynchronously using the provided client.
 
@@ -385,12 +407,14 @@ async def modbus_read_holding_registers(
             The number of holding registers to read. Defaults to 1.
         device_id (int, optional):
             The device_id ID of the Modbus device. Defaults to 1.
+        max_count (int, optional):If greater than zero it determines max chunk size, in which
+            registers will be read. Defaults to zero (read all at once).
         logger (logging.Logger, optional):
             An optional logger instance for logging debug information and errors. If not provided,
             no logging is performed.
 
     Returns:
-        Optional[list[int]]:
+        list[int] | None:
             A list of holding register values if the read operation is successful. Returns None if
             an error occurs, the client fails to connect, or the response does not contain valid
             register payload.
@@ -415,19 +439,21 @@ async def modbus_read_holding_registers(
         count,
         device_id,
         holding=True,
+        max_count=max_count,
         logger=logger,
     )
 
 
-# pylint: disable=too-many-arguments, too-many-positional-arguments
+# pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-branches
 async def modbus_write_registers(
     client: AsyncModbusSerialClient,
     register: int,
     value: list[int],
     device_id: int = 1,
-    logger: Optional[logging.Logger] = None,
+    max_count: int = 0,
+    logger: logging.Logger | None = None,
     no_response_expected: bool = False,
-) -> Optional[list[int]]:
+) -> list[int] | None:
     """
     Writes a sequence of values to Modbus holding registers asynchronously using the provided
     client.
@@ -445,6 +471,8 @@ async def modbus_write_registers(
             A list of values to write to the holding registers.
         device_id (int, optional):
             The device_id ID of the Modbus device. Defaults to 1.
+        max_count (int, optional):If greater than zero it determines max chunk size, in which
+            registers will be written. Defaults to zero (write all at once).
         logger (logging.Logger, optional):
             An optional logger instance for logging debug information and errors. If not provided,
             no logging is performed.
@@ -452,7 +480,7 @@ async def modbus_write_registers(
             If True, do not wait for the device_id response. Defaults to False.
 
     Returns:
-        Optional[list[int]]:
+        list[int] | None:
             A list of written register values if the write operation is successful. Returns None if
             an error occurs, the client fails to connect, or the response does not contain valid
             register payload.
@@ -477,14 +505,25 @@ async def modbus_write_registers(
         )
     await client.connect()
     try:
-        response = await client.write_registers(
-            register,
-            value,
-            device_id=device_id,
-            no_response_expected=no_response_expected,
-        )
+        responses: list[ModbusPDU] = []
+        current_address = register
+        registers_written: int = 0
+        while registers_written < len(value):
+            if max_count < 1:
+                chunk_size = len(value)
+            else:
+                chunk_size = min(max_count, len(value) - registers_written)
+            response = await client.write_registers(
+                current_address,
+                value[registers_written : registers_written + chunk_size],
+                device_id=device_id,
+                no_response_expected=no_response_expected,
+            )
+            registers_written += chunk_size
+            current_address += chunk_size
+            if not no_response_expected:
+                responses.append(response)
     except ModbusException as e:
-        client.close()
         if not no_response_expected:
             if logger:
                 logger.error(
@@ -492,19 +531,23 @@ async def modbus_write_registers(
                     client.comm_params.comm_name,
                     e,
                 )
-        return None
-    client.close()
-    if response.isError():
-        if not no_response_expected:
-            if logger:
-                logger.error(
-                    "%s: Received exception from device (%s)",
-                    client.comm_params.comm_name,
-                    response,
-                )
-        return None
-    if hasattr(response, "registers"):
-        return response.registers
+    finally:
+        client.close()
+    registers: list[int] = []
+    for response in responses:
+        if response.isError():
+            if not no_response_expected:
+                if logger:
+                    logger.error(
+                        "%s: Received exception from device (%s)",
+                        client.comm_params.comm_name,
+                        response,
+                    )
+            return None
+        if hasattr(response, "registers"):
+            registers += response.registers
+    if registers:
+        return registers
     return None
 
 
@@ -514,9 +557,9 @@ async def modbus_write_register(
     register: int,
     value: int,
     device_id: int = 1,
-    logger: Optional[logging.Logger] = None,
+    logger: logging.Logger | None = None,
     no_response_expected: bool = False,
-) -> Optional[int]:
+) -> int | None:
     """
     Writes a value to Modbus holding register asynchronously using the provided
     client.
@@ -541,7 +584,7 @@ async def modbus_write_register(
             If True, do not wait for the device_id response. Defaults to False.
 
     Returns:
-        Optional[int]:
+        int | None:
             A written register value if the write operation is successful. Returns None if
             an error occurs, the client fails to connect, or the response does not contain valid
             register payload.

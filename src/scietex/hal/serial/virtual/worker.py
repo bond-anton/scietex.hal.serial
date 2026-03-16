@@ -29,7 +29,7 @@ This module enables developers to simulate and test complex serial device intera
 relying on physical hardware, making it ideal for testing and debugging scenarios.
 """
 
-from typing import Optional, Callable, BinaryIO
+from typing import Callable, BinaryIO
 import os
 import signal
 import logging
@@ -54,7 +54,7 @@ def generate_virtual_ports(
     master_cache: dict,
     slave_names: dict,
     worker_io: Connection,
-    openpty_func: Optional[Callable] = None,
+    openpty_func: Callable | None = None,
     logger: Logger | None = None,
 ):
     """
@@ -74,7 +74,7 @@ def generate_virtual_ports(
         slave_names (dict): Dictionary mapping device_id names to their associated master file
             descriptors.
         worker_io (Connection): Worker I/O connection for communicating status updates.
-        openpty_func (Optional[Callable], optional): Function to open pseudo-terminal pairs.
+        openpty_func (Callable | None, optional): Function to open pseudo-terminal pairs.
             Defaults to pty.openpty.
         logger (Logger, optional): A logging handler for recording debug, info, warning, and error
             messages related to virtual port generation. Defaults to a basic logger if none
@@ -329,12 +329,13 @@ def forward_data(
             level=logging.DEBUG,
         )
     # pylint: disable=too-many-nested-blocks
+
     for key, events in selector.select(timeout=1):
         key_fd = key.fileobj
         if events & EVENT_READ and isinstance(key_fd, int):
             try:
                 data = master_files[key_fd].read()
-                _logger.debug("VSN: Worker: Received data from fd %s: %s", key_fd, data)
+                # _logger.debug("VSN: Worker: Received data from fd %s: %s", key_fd, data)
                 if data_logger and isinstance(data_logger, Logger):
                     master_cache[key_fd] += data
                     key_fd_name = None
@@ -381,7 +382,7 @@ def process_cmd(
     master_cache: dict,
     slave_names: dict,
     worker_io: Connection,
-    openpty_func: Optional[Callable] = None,
+    openpty_func: Callable | None = None,
     logger: Logger | None = None,
 ) -> bool:
     """
@@ -400,7 +401,7 @@ def process_cmd(
         slave_names (dict): Dictionary mapping device_id names to their associated master file
             descriptors.
         worker_io (Connection): Worker I/O connection for communicating status updates.
-        openpty_func (Optional[Callable], optional): Function to open pseudo-terminal pairs.
+        openpty_func (Callable | None, optional): Function to open pseudo-terminal pairs.
             Defaults to pty.openpty.
         logger (Logger): A logging handler for recording debug, info, warning, and error messages
             related to the virtual network's operation. Defaults to a basic logger if none
@@ -470,7 +471,7 @@ def process_cmd(
 def create_serial_network(
     worker_io: Connection,
     ports_number: int = 2,
-    external_ports: Optional[list[dict]] = None,
+    external_ports: list[dict] | None = None,
     loopback: bool = False,
     openpty_func: Callable = pty.openpty,
     logger: Logger | None = None,
@@ -486,7 +487,7 @@ def create_serial_network(
     Args:
         worker_io (Connection): Worker I/O connection for communicating status updates.
         ports_number (int, optional): Number of virtual ports to generate. Defaults to 2.
-        external_ports (Optional[list[dict]], optional): List of external serial ports to integrate.
+        external_ports (list[dict] | None, optional): List of external serial ports to integrate.
             Defaults to None.
         loopback (bool, optional): Enable loopback mode. Defaults to False.
         openpty_func (Callable, optional): Function to open pseudo-terminal pairs.
