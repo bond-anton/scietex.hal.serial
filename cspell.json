@@ -25,7 +25,13 @@
     "serialposix",
     "signum",
     "pthread",
-    "sigmask"
+    "sigmask",
+    "baudrate",
+    "bytesize",
+    "bytesizes",
+    "stopbits",
+    "signedness",
+    "unsignedness"
   ],
   "ignoreWords": [],
   "import": []
