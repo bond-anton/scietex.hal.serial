@@ -10,7 +10,7 @@ from .virtual import VirtualSerialNetwork, VirtualSerialPair
 from .client import RS485Client
 from .server import RS485Server, ReactiveSequentialDataBlock
 from .utilities import check_sum, lrc, check_lrc, ByteOrder, combine_32bit, split_32bit
-from .utilities import modbus_get_client, find_serial_ports
+from .utilities import modbus_get_client, find_serial_ports, ModbusOperationError
 
 __all__ = [
     "__version__",
@@ -30,4 +30,5 @@ __all__ = [
     "split_32bit",
     "modbus_get_client",
     "find_serial_ports",
+    "ModbusOperationError",
 ]

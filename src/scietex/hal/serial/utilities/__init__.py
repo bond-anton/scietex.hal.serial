@@ -7,6 +7,7 @@ imported directly from :mod:`scietex.hal.serial.utilities`.
 """
 
 from .checksum import check_sum, lrc, check_lrc
+from .exceptions import ModbusOperationError
 from .numeric import (
     ByteOrder,
     to_signed16,
@@ -36,6 +37,7 @@ __all__ = [
     "check_sum",
     "lrc",
     "check_lrc",
+    "ModbusOperationError",
     "ByteOrder",
     "to_signed16",
     "from_signed16",

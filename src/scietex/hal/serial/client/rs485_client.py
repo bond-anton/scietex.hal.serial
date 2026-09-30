@@ -32,6 +32,7 @@ from ..utilities.modbus import (
     modbus_write_registers,
     modbus_write_register,
 )
+from ..utilities.exceptions import ModbusOperationError
 
 from ..utilities.numeric import (
     ByteOrder,
@@ -187,7 +188,10 @@ class RS485Client:
         )
 
     async def execute(
-        self, request: ModbusPDU, no_response_expected: bool = False
+        self,
+        request: ModbusPDU,
+        no_response_expected: bool = False,
+        raise_on_error: bool = False,
     ) -> ModbusPDU | None:
         """
         Execute a Modbus request asynchronously.
@@ -197,6 +201,9 @@ class RS485Client:
                 The Modbus Protocol Data Unit (PDU) representing the request to be sent.
             no_response_expected (bool, optional):
                 If True, indicates that no response is expected from the device. Defaults to False.
+            raise_on_error (bool, optional):
+                If True, raises `ModbusOperationError` on failure instead of returning None.
+                Defaults to False.
 
         Returns:
             ModbusPDU | None:
@@ -204,7 +211,11 @@ class RS485Client:
                 no response is expected.
         """
         return await modbus_execute(
-            self.client, request, no_response_expected, self.logger
+            self.client,
+            request,
+            no_response_expected,
+            self.logger,
+            raise_on_error,
         )
 
     async def read_registers(
@@ -213,6 +224,7 @@ class RS485Client:
         count: int = 1,
         holding: bool = True,
         signed: bool = False,
+        raise_on_error: bool = False,
     ) -> list[int] | None:
         """
         Read payload from Modbus registers.
@@ -227,6 +239,9 @@ class RS485Client:
                 Defaults to True.
             signed (bool, optional):
                 If True, interprets the register value as a signed integer. Defaults to False.
+            raise_on_error (bool, optional):
+                If True, raises `ModbusOperationError` on failure instead of returning None.
+                Defaults to False.
 
         Returns:
             list[int] | None:
@@ -241,6 +256,7 @@ class RS485Client:
             holding=holding,
             max_count=self.__read_chunk_size,
             logger=self.logger,
+            raise_on_error=raise_on_error,
         )
         if response is not None:
             if signed:
@@ -250,7 +266,11 @@ class RS485Client:
         return None
 
     async def read_register(
-        self, register: int, holding: bool = True, signed: bool = False
+        self,
+        register: int,
+        holding: bool = True,
+        signed: bool = False,
+        raise_on_error: bool = False,
     ) -> int | None:
         """
         Read payload from a single Modbus register.
@@ -263,6 +283,9 @@ class RS485Client:
                 Defaults to True.
             signed (bool, optional):
                 If True, interprets the register value as a signed integer. Defaults to False.
+            raise_on_error (bool, optional):
+                If True, raises `ModbusOperationError` on failure instead of returning None.
+                Defaults to False.
 
         Returns:
             int | None:
@@ -270,7 +293,7 @@ class RS485Client:
                 is invalid.
         """
         response: list[int] | None = await self.read_registers(
-            register, count=1, holding=holding
+            register, count=1, holding=holding, raise_on_error=raise_on_error
         )
         if response:
             if signed:
@@ -284,6 +307,7 @@ class RS485Client:
         values: list[int],
         signed: bool = False,
         no_response_expected: bool = False,
+        raise_on_error: bool = False,
     ) -> list[int] | None:
         """
         Write payload to Modbus registers.
@@ -297,6 +321,9 @@ class RS485Client:
                 If True, interprets the value as a signed integer. Defaults to False.
             no_response_expected (bool):
                 If True, do not wait for the device_id response. Defaults to False.
+            raise_on_error (bool, optional):
+                If True, raises `ModbusOperationError` when the write returns no echo instead of
+                falling back to a read. Defaults to False.
 
         Returns:
             list[int] | None:
@@ -316,6 +343,7 @@ class RS485Client:
             max_count=self.__write_chunk_size,
             logger=self.logger,
             no_response_expected=no_response_expected,
+            raise_on_error=raise_on_error,
         )
         if response:
             if signed:
@@ -324,6 +352,11 @@ class RS485Client:
             return response
         if no_response_expected:
             return None
+        if raise_on_error:
+            raise ModbusOperationError(
+                f"{self.client.comm_params.comm_name}: "
+                f"Write to registers {start_register} returned no echo"
+            )
         return await self.read_registers(
             start_register, count=len(values), holding=True, signed=signed
         )
@@ -334,6 +367,7 @@ class RS485Client:
         value: int,
         signed: bool = False,
         no_response_expected: bool = False,
+        raise_on_error: bool = False,
     ) -> int | None:
         """
         Write payload to a single Modbus register.
@@ -347,6 +381,9 @@ class RS485Client:
                 If True, interprets the value as a signed integer. Defaults to False.
             no_response_expected (bool):
                 If True, do not wait for the device_id response. Defaults to False.
+            raise_on_error (bool, optional):
+                If True, raises `ModbusOperationError` when the write returns no echo instead of
+                falling back to a read. Defaults to False.
 
         Returns:
             int | None:
@@ -365,6 +402,7 @@ class RS485Client:
             device_id=self.address,
             logger=self.logger,
             no_response_expected=no_response_expected,
+            raise_on_error=raise_on_error,
         )
         if response:
             if signed:
@@ -372,6 +410,11 @@ class RS485Client:
             return response
         if no_response_expected:
             return None
+        if raise_on_error:
+            raise ModbusOperationError(
+                f"{self.client.comm_params.comm_name}: "
+                f"Write to register {register} returned no echo"
+            )
         return await self.read_register(register, holding=True, signed=signed)
 
     async def read_register_float(
@@ -380,6 +423,7 @@ class RS485Client:
         factor: int = 100,
         signed: bool = False,
         holding: bool = True,
+        raise_on_error: bool = False,
     ) -> float | None:
         """
         Read and parse a float value from a single Modbus register.
@@ -396,18 +440,22 @@ class RS485Client:
             holding (bool, optional):
                 If True, reads from holding registers; otherwise, reads from input registers.
                 Defaults to True.
+            raise_on_error (bool, optional):
+                If True, raises `ModbusOperationError` on failure instead of returning None.
+                Defaults to False.
 
         Returns:
             float | None:
                 The parsed float value. Returns None if an error occurs or the response is invalid.
         """
         response: int | None = await self.read_register(
-            register, holding=holding, signed=signed
+            register, holding=holding, signed=signed, raise_on_error=raise_on_error
         )
         if response:
             return float_from_int(response, factor)
         return None
 
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
     async def write_register_float(
         self,
         register: int,
@@ -415,6 +463,7 @@ class RS485Client:
         factor: int = 100,
         signed: bool = False,
         no_response_expected: bool = False,
+        raise_on_error: bool = False,
     ) -> float | None:
         """
         Write a float value to a single Modbus register.
@@ -432,6 +481,9 @@ class RS485Client:
                 If True, interprets the value as a signed integer. Defaults to False.
             no_response_expected (bool):
                 If True, do not wait for the device_id response. Defaults to False.
+            raise_on_error (bool, optional):
+                If True, raises `ModbusOperationError` when the write returns no echo instead of
+                falling back to a read. Defaults to False.
 
         Returns:
             float | None:
@@ -443,6 +495,7 @@ class RS485Client:
             float_to_unsigned16(value, factor),
             signed=False,
             no_response_expected=no_response_expected,
+            raise_on_error=raise_on_error,
         )
         if response:
             if signed:
@@ -450,6 +503,11 @@ class RS485Client:
             return float_from_int(response, factor)
         if no_response_expected:
             return None
+        if raise_on_error:
+            raise ModbusOperationError(
+                f"{self.client.comm_params.comm_name}: "
+                f"Write to register {register} returned no echo"
+            )
         return await self.read_register_float(register, factor, signed=signed)
 
     async def read_two_registers_int(
@@ -458,6 +516,7 @@ class RS485Client:
         holding: bool = True,
         byteorder: ByteOrder = ByteOrder.LITTLE_ENDIAN,
         signed: bool = False,
+        raise_on_error: bool = False,
     ) -> int | None:
         """
         Read and parse a 32-bit integer value from two Modbus registers.
@@ -473,6 +532,9 @@ class RS485Client:
                 Defaults to `ByteOrder.LITTLE_ENDIAN`.
             signed (bool, optional):
                 If True, interprets the value as a signed integer. Defaults to False.
+            raise_on_error (bool, optional):
+                If True, raises `ModbusOperationError` on failure or an invalid response instead
+                of returning None. Defaults to False.
 
         Returns:
             int | None:
@@ -480,13 +542,18 @@ class RS485Client:
                 is invalid.
         """
         response: list[int] | None = await self.read_registers(
-            start_register, count=2, holding=holding
+            start_register, count=2, holding=holding, raise_on_error=raise_on_error
         )
         if response and len(response) == 2:
             val = combine_32bit(response[0], response[1], byteorder)
             if signed:
                 return to_signed32(val)
             return val
+        if raise_on_error:
+            raise ModbusOperationError(
+                f"{self.client.comm_params.comm_name}: "
+                f"Invalid response: expected 2 registers, got {response}"
+            )
         self.logger.debug("Invalid response: expected 2 registers, got %s", response)
         return None
 
@@ -498,6 +565,7 @@ class RS485Client:
         holding: bool = True,
         byteorder: ByteOrder = ByteOrder.LITTLE_ENDIAN,
         signed: bool = False,
+        raise_on_error: bool = False,
     ) -> float | None:
         """
         Read and parse a float value from two Modbus registers.
@@ -519,6 +587,9 @@ class RS485Client:
                 Defaults to `ByteOrder.LITTLE_ENDIAN`.
             signed (bool, optional):
                 If True, interprets the value as a signed integer. Defaults to False.
+            raise_on_error (bool, optional):
+                If True, raises `ModbusOperationError` on failure instead of returning None.
+                Defaults to False.
 
         Returns:
             float | None:
@@ -530,13 +601,18 @@ class RS485Client:
         if factor == 0:
             raise ValueError("Factor cannot be zero.")
         response: int | None = await self.read_two_registers_int(
-            start_register, holding=holding, byteorder=byteorder, signed=signed
+            start_register,
+            holding=holding,
+            byteorder=byteorder,
+            signed=signed,
+            raise_on_error=raise_on_error,
         )
         if response is not None:
             return float_from_int(response, factor)
         self.logger.debug("Failed to read registers for float conversion.")
         return None
 
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
     async def write_two_registers(
         self,
         start_register: int,
@@ -544,6 +620,7 @@ class RS485Client:
         byteorder: ByteOrder = ByteOrder.LITTLE_ENDIAN,
         signed: bool = False,
         no_response_expected: bool = False,
+        raise_on_error: bool = False,
     ) -> int | None:
         """
         Write a 32-bit integer value to two Modbus registers.
@@ -560,6 +637,9 @@ class RS485Client:
                 If True, interprets the value as a signed integer. Defaults to False.
             no_response_expected (bool):
                 If True, do not wait for the device_id response. Defaults to False.
+            raise_on_error (bool, optional):
+                If True, raises `ModbusOperationError` when the write returns no echo instead of
+                falling back to a read. Defaults to False.
 
         Returns:
             int | None:
@@ -579,6 +659,7 @@ class RS485Client:
             max_count=self.__write_chunk_size,
             logger=self.logger,
             no_response_expected=no_response_expected,
+            raise_on_error=raise_on_error,
         )
         if response and len(response) == 2:
             val = combine_32bit(response[0], response[1], byteorder)
@@ -587,6 +668,11 @@ class RS485Client:
             return val
         if no_response_expected:
             return None
+        if raise_on_error:
+            raise ModbusOperationError(
+                f"{self.client.comm_params.comm_name}: "
+                f"Write to registers {start_register} returned no echo"
+            )
         return await self.read_two_registers_int(
             start_register=start_register,
             holding=True,
@@ -594,6 +680,7 @@ class RS485Client:
             signed=signed,
         )
 
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
     async def write_two_registers_float(
         self,
         start_register: int,
@@ -602,6 +689,7 @@ class RS485Client:
         byteorder: ByteOrder = ByteOrder.LITTLE_ENDIAN,
         signed: bool = False,
         no_response_expected: bool = False,
+        raise_on_error: bool = False,
     ) -> float | None:
         """
         Write a float value to two Modbus registers.
@@ -623,6 +711,9 @@ class RS485Client:
                 If True, interprets the value as a signed integer. Defaults to False.
             no_response_expected (bool):
                 If True, do not wait for the device_id response. Defaults to False.
+            raise_on_error (bool, optional):
+                If True, raises `ModbusOperationError` when the write returns no echo instead of
+                falling back to a read. Defaults to False.
 
         Returns:
             float | None:
@@ -639,6 +730,7 @@ class RS485Client:
             byteorder,
             signed,
             no_response_expected=no_response_expected,
+            raise_on_error=raise_on_error,
         )
         if response is not None:
             if signed:
@@ -646,6 +738,11 @@ class RS485Client:
             return float_from_int(response, factor)
         if no_response_expected:
             return None
+        if raise_on_error:
+            raise ModbusOperationError(
+                f"{self.client.comm_params.comm_name}: "
+                f"Write to registers {start_register} returned no echo"
+            )
         return await self.read_two_registers_float(
             start_register, factor, signed=signed
         )

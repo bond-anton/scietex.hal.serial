@@ -38,6 +38,7 @@ from pymodbus.client import AsyncModbusSerialClient
 
 from ..config import SerialConnectionMinimalConfigModel
 from ..config.defaults import DEFAULT_TIMEOUT, DEFAULT_FRAMER
+from .exceptions import ModbusOperationError
 
 
 def modbus_connection_config(con_params: SerialConnectionMinimalConfigModel) -> dict:
@@ -162,6 +163,7 @@ async def modbus_execute(
     request: ModbusPDU,
     no_response_expected: bool = False,
     logger: logging.Logger | None = None,
+    raise_on_error: bool = False,
 ):
     """
     Executes a Modbus request asynchronously using the provided client and handles the response.
@@ -180,6 +182,9 @@ async def modbus_execute(
         logger (logging.Logger | None, optional):
             An optional logger instance for logging errors and exceptions. If not provided,
             no logging is performed.
+        raise_on_error (bool, optional):
+            If True, raises `ModbusOperationError` on failure instead of returning None.
+            Defaults to False.
 
     Returns:
         ModbusPDU | None:
@@ -189,6 +194,9 @@ async def modbus_execute(
     Raises:
         ModbusException:
             If an error occurs during the execution of the Modbus request.
+        ModbusOperationError:
+            If `raise_on_error` is True and the request fails to connect, execute, or the device
+            returns an error response.
 
     Notes:
         - The function ensures that the client connection is closed after execution, even if an
@@ -199,6 +207,10 @@ async def modbus_execute(
     """
     await client.connect()
     if not client.connected:
+        if raise_on_error:
+            raise ModbusOperationError(
+                f"{client.comm_params.comm_name}: Failed to connect to Modbus device"
+            )
         return None
     try:
         response = await client.execute(no_response_expected, request)
@@ -209,15 +221,25 @@ async def modbus_execute(
                 client.comm_params.comm_name,
                 e,
             )
+        if raise_on_error:
+            raise ModbusOperationError(
+                f"{client.comm_params.comm_name}: Modbus exception on request execute: {e}"
+            ) from e
         return None
     finally:
         client.close()
+    if no_response_expected:
+        return None
     if response.isError():
         if logger:
             logger.error(
                 "%s: Received exception from device (%s)",
                 client.comm_params.comm_name,
                 response,
+            )
+        if raise_on_error:
+            raise ModbusOperationError(
+                f"{client.comm_params.comm_name}: Received exception from device: {response}"
             )
         return None
     return response
@@ -232,6 +254,7 @@ async def modbus_read_registers(
     holding: bool = True,
     max_count: int = 0,
     logger: logging.Logger | None = None,
+    raise_on_error: bool = False,
 ) -> list[int] | None:
     """
     Reads a sequence of Modbus registers asynchronously using the provided client.
@@ -257,6 +280,9 @@ async def modbus_read_registers(
         logger (logging.Logger, optional):
             An optional logger instance for logging errors and exceptions. If not provided,
             no logging is performed.
+        raise_on_error (bool, optional):
+            If True, raises `ModbusOperationError` on failure instead of returning None.
+            Defaults to False.
 
     Returns:
         list[int] | None:
@@ -267,6 +293,9 @@ async def modbus_read_registers(
     Raises:
         ModbusException:
             If an error occurs during the execution of the Modbus read operation.
+        ModbusOperationError:
+            If `raise_on_error` is True and the read fails to connect, raises a Modbus exception,
+            receives an error response, or returns no register payload.
 
     Notes:
         - The function ensures that the client connection is closed after execution, even if an
@@ -277,6 +306,10 @@ async def modbus_read_registers(
     """
     await client.connect()
     if not client.connected:
+        if raise_on_error:
+            raise ModbusOperationError(
+                f"{client.comm_params.comm_name}: Failed to connect to Modbus device"
+            )
         return None
     try:
         responses: list[ModbusPDU] = []
@@ -305,6 +338,10 @@ async def modbus_read_registers(
                 client.comm_params.comm_name,
                 e,
             )
+        if raise_on_error:
+            raise ModbusOperationError(
+                f"{client.comm_params.comm_name}: Modbus exception on read registers: {e}"
+            ) from e
         return None
     finally:
         client.close()
@@ -317,11 +354,19 @@ async def modbus_read_registers(
                     client.comm_params.comm_name,
                     response,
                 )
+            if raise_on_error:
+                raise ModbusOperationError(
+                    f"{client.comm_params.comm_name}: Received exception from device: {response}"
+                )
             return None
         if hasattr(response, "registers"):
             registers += response.registers
     if registers:
         return registers
+    if raise_on_error:
+        raise ModbusOperationError(
+            f"{client.comm_params.comm_name}: No registers returned"
+        )
     return None
 
 
@@ -333,6 +378,7 @@ async def modbus_read_input_registers(
     device_id: int = 1,
     max_count: int = 0,
     logger: logging.Logger | None = None,
+    raise_on_error: bool = False,
 ) -> list[int] | None:
     """
     Reads a sequence of Modbus input registers asynchronously using the provided client.
@@ -355,6 +401,9 @@ async def modbus_read_input_registers(
         logger (logging.Logger, optional):
             An optional logger instance for logging debug information and errors. If not provided,
             no logging is performed.
+        raise_on_error (bool, optional):
+            If True, raises `ModbusOperationError` on failure instead of returning None.
+            Defaults to False.
 
     Returns:
         list[int] | None:
@@ -384,6 +433,7 @@ async def modbus_read_input_registers(
         holding=False,
         max_count=max_count,
         logger=logger,
+        raise_on_error=raise_on_error,
     )
 
 
@@ -395,6 +445,7 @@ async def modbus_read_holding_registers(
     device_id: int = 1,
     max_count: int = 0,
     logger: logging.Logger | None = None,
+    raise_on_error: bool = False,
 ) -> list[int] | None:
     """
     Reads a sequence of Modbus holding registers asynchronously using the provided client.
@@ -417,6 +468,9 @@ async def modbus_read_holding_registers(
         logger (logging.Logger, optional):
             An optional logger instance for logging debug information and errors. If not provided,
             no logging is performed.
+        raise_on_error (bool, optional):
+            If True, raises `ModbusOperationError` on failure instead of returning None.
+            Defaults to False.
 
     Returns:
         list[int] | None:
@@ -446,6 +500,7 @@ async def modbus_read_holding_registers(
         holding=True,
         max_count=max_count,
         logger=logger,
+        raise_on_error=raise_on_error,
     )
 
 
@@ -458,6 +513,7 @@ async def modbus_write_registers(
     max_count: int = 0,
     logger: logging.Logger | None = None,
     no_response_expected: bool = False,
+    raise_on_error: bool = False,
 ) -> list[int] | None:
     """
     Writes a sequence of values to Modbus holding registers asynchronously using the provided
@@ -483,6 +539,9 @@ async def modbus_write_registers(
             no logging is performed.
         no_response_expected (bool):
             If True, do not wait for the device_id response. Defaults to False.
+        raise_on_error (bool, optional):
+            If True, raises `ModbusOperationError` on failure instead of returning None.
+            Defaults to False.
 
     Returns:
         list[int] | None:
@@ -493,6 +552,10 @@ async def modbus_write_registers(
     Raises:
         ModbusException:
             If an error occurs during the execution of the Modbus write operation.
+        ModbusOperationError:
+            If `raise_on_error` is True and the write fails (raises a Modbus exception, receives
+            an error response, or returns no register echo). Not raised when
+            `no_response_expected` is True.
 
     Notes:
         - The function ensures that the client connection is closed after execution, even if an
@@ -536,6 +599,10 @@ async def modbus_write_registers(
                     client.comm_params.comm_name,
                     e,
                 )
+            if raise_on_error:
+                raise ModbusOperationError(
+                    f"{client.comm_params.comm_name}: Modbus exception on write register: {e}"
+                ) from e
     finally:
         client.close()
     registers: list[int] = []
@@ -548,11 +615,20 @@ async def modbus_write_registers(
                         client.comm_params.comm_name,
                         response,
                     )
+                if raise_on_error:
+                    raise ModbusOperationError(
+                        f"{client.comm_params.comm_name}: "
+                        f"Received exception from device: {response}"
+                    )
             return None
         if hasattr(response, "registers"):
             registers += response.registers
     if registers:
         return registers
+    if raise_on_error and not no_response_expected:
+        raise ModbusOperationError(
+            f"{client.comm_params.comm_name}: No registers written"
+        )
     return None
 
 
@@ -564,6 +640,7 @@ async def modbus_write_register(
     device_id: int = 1,
     logger: logging.Logger | None = None,
     no_response_expected: bool = False,
+    raise_on_error: bool = False,
 ) -> int | None:
     """
     Writes a value to Modbus holding register asynchronously using the provided
@@ -587,6 +664,9 @@ async def modbus_write_register(
             no logging is performed.
         no_response_expected (bool):
             If True, do not wait for the device_id response. Defaults to False.
+        raise_on_error (bool, optional):
+            If True, raises `ModbusOperationError` on failure instead of returning None.
+            Defaults to False.
 
     Returns:
         int | None:
@@ -597,6 +677,10 @@ async def modbus_write_register(
     Raises:
         ModbusException:
             If an error occurs during the execution of the Modbus write operation.
+        ModbusOperationError:
+            If `raise_on_error` is True and the write fails (raises a Modbus exception, receives
+            an error response, or returns no register echo). Not raised when
+            `no_response_expected` is True.
 
     Notes:
         - The function ensures that the client connection is closed after execution, even if an
@@ -626,17 +710,30 @@ async def modbus_write_register(
                     client.comm_params.comm_name,
                     e,
                 )
+            if raise_on_error:
+                raise ModbusOperationError(
+                    f"{client.comm_params.comm_name}: Modbus exception on write register: {e}"
+                ) from e
         return None
     client.close()
+    if no_response_expected:
+        return None
     if response.isError():
-        if no_response_expected:
-            if logger:
-                logger.error(
-                    "%s: Received exception from device (%s)",
-                    client.comm_params.comm_name,
-                    response,
-                )
+        if logger:
+            logger.error(
+                "%s: Received exception from device (%s)",
+                client.comm_params.comm_name,
+                response,
+            )
+        if raise_on_error:
+            raise ModbusOperationError(
+                f"{client.comm_params.comm_name}: Received exception from device: {response}"
+            )
         return None
     if hasattr(response, "registers"):
         return response.registers[0]
+    if raise_on_error:
+        raise ModbusOperationError(
+            f"{client.comm_params.comm_name}: No register written"
+        )
     return None
