@@ -257,7 +257,7 @@ class RS485Server:
             try:
                 await self._task
             except asyncio.CancelledError:
-                pass
+                self.logger.debug("Server task cancelled during stop")
             finally:
                 if self._task.done():
                     self._task = None

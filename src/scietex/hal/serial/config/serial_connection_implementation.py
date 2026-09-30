@@ -120,7 +120,7 @@ class SerialConnectionMinimalConfig(SerialConnectionMinimalConfigModel):
     @property
     def port(self) -> str:
         """
-        The serial port name (COM1, /dev/serial0, etc.).
+        The serial port name (e.g. /dev/ttyUSB0, /dev/serial0).
 
         Returns:
             str: The name of the serial port.

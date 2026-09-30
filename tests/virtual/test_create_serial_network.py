@@ -6,11 +6,11 @@ from multiprocessing import Pipe
 
 import pytest
 
+from tests.utilities.mock import mock_openpty
+
 try:
-    from src.scietex.hal.serial.utilities.mock import mock_openpty
     from src.scietex.hal.serial.virtual.worker import create_serial_network
 except ModuleNotFoundError:
-    from scietex.hal.serial.utilities.mock import mock_openpty
     from scietex.hal.serial.virtual.worker import create_serial_network
 
 

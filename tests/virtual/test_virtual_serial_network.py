@@ -5,15 +5,15 @@ from logging import Logger
 
 import pytest
 
+from tests.utilities.mock import mock_openpty
+
 try:
     from src.scietex.hal.serial.config import SerialConnectionConfig
-    from src.scietex.hal.serial.utilities.mock import mock_openpty
     from src.scietex.hal.serial.virtual.virtual_serial_network import (
         VirtualSerialNetwork,
     )
 except ModuleNotFoundError:
     from scietex.hal.serial.config import SerialConnectionConfig
-    from scietex.hal.serial.utilities.mock import mock_openpty
     from scietex.hal.serial.virtual.virtual_serial_network import (
         VirtualSerialNetwork,
     )
