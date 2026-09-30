@@ -2,12 +2,12 @@
 Modbus server initialization module.
 
 This module consolidates and exports key components of the Modbus server framework, including the
-reactive payload block and the RS485 server implementation. Developers can utilize these components
+payload block and the RS485 server implementation. Developers can utilize these components
 to build and configure Modbus servers tailored to their specific requirements.
 
 Exported Classes:
-    - ReactiveSequentialDataBlock: Custom reactive payload block for Modbus servers, supporting
-      callbacks on value changes.
+    - ReactiveSequentialDataBlock: Sequential payload block for Modbus servers, retained for
+      backwards compatibility.
     - RS485Server: Implementation of an RS485 Modbus server capable of managing multiple device_id
       contexts and responding to Modbus requests.
 
