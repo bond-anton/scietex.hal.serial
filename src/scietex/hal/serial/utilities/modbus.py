@@ -88,12 +88,14 @@ def modbus_connection_config(con_params: SerialConnectionMinimalConfigModel) -> 
     return {k: params_dict[k] for k in keys}
 
 
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 def modbus_get_client(
     con_params: SerialConnectionMinimalConfigModel,
     custom_framer: type[FramerBase] | None = None,
     custom_decoder: type[DecodePDU] | None = None,
     custom_response: list[type[ModbusPDU]] | None = None,
     label: str | None = None,
+    retries: int = 3,
 ) -> AsyncModbusSerialClient:
     """
     Creates and configures an asynchronous Modbus serial client with optional customizations.
@@ -118,6 +120,9 @@ def modbus_get_client(
             These are used to handle specific types of Modbus responses.
         label (str | None):
             An optional label for the client. If not provided, the default label "RS485" is used.
+        retries (int, optional):
+            The number of retries the transaction manager performs before giving up.
+            Defaults to 3.
 
     Returns:
         AsyncModbusSerialClient:
@@ -140,7 +145,7 @@ def modbus_get_client(
     client.ctx = TransactionManager(
         client.comm_params,
         framer_instance,
-        retries=3,
+        retries=retries,
         is_server=False,
         trace_packet=None,
         trace_pdu=None,

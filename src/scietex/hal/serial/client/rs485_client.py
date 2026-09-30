@@ -135,6 +135,18 @@ class RS485Client:
         else:
             self.logger = logger
 
+    async def close(self) -> None:
+        """Close the underlying Modbus client and release the serial port."""
+        self.client.close()
+
+    async def __aenter__(self) -> "RS485Client":
+        """Enter the async context manager."""
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        """Exit the async context manager, closing the client."""
+        await self.close()
+
     @property
     def con_params(
         self,
