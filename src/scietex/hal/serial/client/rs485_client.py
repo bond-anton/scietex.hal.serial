@@ -14,6 +14,7 @@ This module simplifies interaction with Modbus devices over RS485, making it eas
 with industrial automation systems and IoT applications.
 """
 
+from contextlib import asynccontextmanager
 from logging import Logger, getLogger
 from typing import Any
 
@@ -27,6 +28,7 @@ from ..config import (
 )
 from ..utilities.exceptions import ModbusOperationError
 from ..utilities.modbus import (
+    modbus_connection,
     modbus_execute,
     modbus_get_client,
     modbus_read_registers,
@@ -87,6 +89,9 @@ class RS485Client:
             The Modbus client instance used for communication.
         address (int):
             The device_id address of the Modbus device.
+        _manage_connection (bool):
+            Whether each operation connects and closes the underlying client. Set to False while
+            inside a ``connection()`` block so operations reuse the single open connection.
         _label (str):
             A label for the client, used for logging and identification.
         logger (Logger):
@@ -122,6 +127,7 @@ class RS485Client:
         )
 
         self.address: int = address
+        self._manage_connection: bool = True
         self.__read_chunk_size: int = 0
         if chunk_size is not None:
             self.__read_chunk_size = max(0, chunk_size)
@@ -145,6 +151,26 @@ class RS485Client:
     async def __aexit__(self, exc_type, exc, tb) -> None:
         """Exit the async context manager, closing the client."""
         await self.close()
+
+    @asynccontextmanager
+    async def connection(self):
+        """
+        Reuse a single connection across multiple operations.
+
+        While inside the block the client does not connect or close per
+        operation; the connection is opened on entry and closed on exit,
+        including on error.
+
+        Yields:
+            RS485Client: This client, for chained operations.
+        """
+        async with modbus_connection(self.client):
+            previous = self._manage_connection
+            self._manage_connection = False
+            try:
+                yield self
+            finally:
+                self._manage_connection = previous
 
     @property
     def con_params(
@@ -214,6 +240,7 @@ class RS485Client:
             no_response_expected,
             self.logger,
             raise_on_error,
+            manage_connection=self._manage_connection,
         )
 
     async def read_registers(
@@ -255,6 +282,7 @@ class RS485Client:
             max_count=self.__read_chunk_size,
             logger=self.logger,
             raise_on_error=raise_on_error,
+            manage_connection=self._manage_connection,
         )
         if response is not None:
             if signed:
@@ -343,6 +371,7 @@ class RS485Client:
             logger=self.logger,
             no_response_expected=no_response_expected,
             raise_on_error=raise_on_error,
+            manage_connection=self._manage_connection,
         )
         if response:
             if signed:
@@ -402,6 +431,7 @@ class RS485Client:
             logger=self.logger,
             no_response_expected=no_response_expected,
             raise_on_error=raise_on_error,
+            manage_connection=self._manage_connection,
         )
         if response is not None:
             if signed:
@@ -649,6 +679,7 @@ class RS485Client:
             logger=self.logger,
             no_response_expected=no_response_expected,
             raise_on_error=raise_on_error,
+            manage_connection=self._manage_connection,
         )
         if response and len(response) == 2:
             val = combine_32bit(response[0], response[1], byteorder)

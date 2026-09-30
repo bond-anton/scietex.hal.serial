@@ -13,6 +13,9 @@ Functions:
     - modbus_connection_config(con_params: SerialConnectionMinimalConfigModel) -> dict:
         Prepares a dictionary of parameters for establishing a Modbus connection over
         a serial interface.
+    - modbus_connection(client: AsyncModbusSerialClient):
+        Asynchronous context manager that connects once and keeps the connection open
+        for the duration of the block, closing it on exit.
     - modbus_read_registers(con_params: ..., start_register: int = 0, ...)
         -> list[int] | None: Reads payload from Modbus holding or input registers.
     - modbus_read_input_registers(con_params: ..., start_register: int = 0, ...)
@@ -30,6 +33,7 @@ focus on higher-level tasks such as retrieving or updating device states.
 """
 
 import logging
+from contextlib import asynccontextmanager
 
 from pymodbus import FramerType, ModbusException
 from pymodbus.client import AsyncModbusSerialClient
@@ -156,12 +160,37 @@ def modbus_get_client(
     return client
 
 
+@asynccontextmanager
+async def modbus_connection(client: AsyncModbusSerialClient):
+    """
+    Connect once and keep the connection open for the duration of the block.
+
+    Args:
+        client (AsyncModbusSerialClient):
+            The asynchronous Modbus serial client to connect and hold open.
+
+    Yields:
+        AsyncModbusSerialClient: The same connected client.
+
+    Notes:
+        - The connection is closed when the block exits, even on error.
+        - Pair with ``manage_connection=False`` on the modbus wrappers so they
+          do not connect/close per operation.
+    """
+    await client.connect()
+    try:
+        yield client
+    finally:
+        client.close()
+
+
 async def modbus_execute(
     client: AsyncModbusSerialClient,
     request: ModbusPDU,
     no_response_expected: bool = False,
     logger: logging.Logger | None = None,
     raise_on_error: bool = True,
+    manage_connection: bool = True,
 ):
     """
     Executes a Modbus request asynchronously using the provided client and handles the response.
@@ -183,6 +212,9 @@ async def modbus_execute(
         raise_on_error (bool, optional):
             If True, raises `ModbusOperationError` on failure instead of returning None.
             Defaults to True. Pass False to restore the legacy `None`-returning behavior.
+        manage_connection (bool, optional):
+            If True, connects before executing and closes after. Defaults to True. Pass False
+            when the client is managed by a surrounding ``modbus_connection`` context.
 
     Returns:
         ModbusPDU | None:
@@ -203,7 +235,8 @@ async def modbus_execute(
           from the device.
         - Errors and exceptions are logged if a logger is provided.
     """
-    await client.connect()
+    if manage_connection:
+        await client.connect()
     if not client.connected:
         if no_response_expected:
             return None
@@ -228,7 +261,8 @@ async def modbus_execute(
                 ) from e
         return None
     finally:
-        client.close()
+        if manage_connection:
+            client.close()
     if no_response_expected:
         return None
     if response.isError():
@@ -255,6 +289,7 @@ async def modbus_read_registers(
     max_count: int = 0,
     logger: logging.Logger | None = None,
     raise_on_error: bool = True,
+    manage_connection: bool = True,
 ) -> list[int] | None:
     """
     Reads a sequence of Modbus registers asynchronously using the provided client.
@@ -283,6 +318,9 @@ async def modbus_read_registers(
         raise_on_error (bool, optional):
             If True, raises `ModbusOperationError` on failure instead of returning None.
             Defaults to True. Pass False to restore the legacy `None`-returning behavior.
+        manage_connection (bool, optional):
+            If True, connects before reading and closes after. Defaults to True. Pass False when
+            the client is managed by a surrounding ``modbus_connection`` context.
 
     Returns:
         list[int] | None:
@@ -304,7 +342,8 @@ async def modbus_read_registers(
         - The function distinguishes between holding and input registers based on the `holding`
           argument.
     """
-    await client.connect()
+    if manage_connection:
+        await client.connect()
     if not client.connected:
         if raise_on_error:
             raise ModbusOperationError(
@@ -344,7 +383,8 @@ async def modbus_read_registers(
             ) from e
         return None
     finally:
-        client.close()
+        if manage_connection:
+            client.close()
     registers: list[int] = []
     for response in responses:
         if response.isError():
@@ -376,6 +416,7 @@ async def modbus_read_input_registers(
     max_count: int = 0,
     logger: logging.Logger | None = None,
     raise_on_error: bool = True,
+    manage_connection: bool = True,
 ) -> list[int] | None:
     """
     Reads a sequence of Modbus input registers asynchronously using the provided client.
@@ -401,6 +442,9 @@ async def modbus_read_input_registers(
         raise_on_error (bool, optional):
             If True, raises `ModbusOperationError` on failure instead of returning None.
             Defaults to True. Pass False to restore the legacy `None`-returning behavior.
+        manage_connection (bool, optional):
+            If True, connects before reading and closes after. Defaults to True. Pass False when
+            the client is managed by a surrounding ``modbus_connection`` context.
 
     Returns:
         list[int] | None:
@@ -431,6 +475,7 @@ async def modbus_read_input_registers(
         max_count=max_count,
         logger=logger,
         raise_on_error=raise_on_error,
+        manage_connection=manage_connection,
     )
 
 
@@ -442,6 +487,7 @@ async def modbus_read_holding_registers(
     max_count: int = 0,
     logger: logging.Logger | None = None,
     raise_on_error: bool = True,
+    manage_connection: bool = True,
 ) -> list[int] | None:
     """
     Reads a sequence of Modbus holding registers asynchronously using the provided client.
@@ -467,6 +513,9 @@ async def modbus_read_holding_registers(
         raise_on_error (bool, optional):
             If True, raises `ModbusOperationError` on failure instead of returning None.
             Defaults to True. Pass False to restore the legacy `None`-returning behavior.
+        manage_connection (bool, optional):
+            If True, connects before reading and closes after. Defaults to True. Pass False when
+            the client is managed by a surrounding ``modbus_connection`` context.
 
     Returns:
         list[int] | None:
@@ -497,6 +546,7 @@ async def modbus_read_holding_registers(
         max_count=max_count,
         logger=logger,
         raise_on_error=raise_on_error,
+        manage_connection=manage_connection,
     )
 
 
@@ -509,6 +559,7 @@ async def modbus_write_registers(
     logger: logging.Logger | None = None,
     no_response_expected: bool = False,
     raise_on_error: bool = True,
+    manage_connection: bool = True,
 ) -> list[int] | None:
     """
     Writes a sequence of values to Modbus holding registers asynchronously using the provided
@@ -537,6 +588,9 @@ async def modbus_write_registers(
         raise_on_error (bool, optional):
             If True, raises `ModbusOperationError` on failure instead of returning None.
             Defaults to True. Pass False to restore the legacy `None`-returning behavior.
+        manage_connection (bool, optional):
+            If True, connects before writing and closes after. Defaults to True. Pass False when
+            the client is managed by a surrounding ``modbus_connection`` context.
 
     Returns:
         list[int] | None:
@@ -564,7 +618,8 @@ async def modbus_write_registers(
             register,
             register + len(value),
         )
-    await client.connect()
+    if manage_connection:
+        await client.connect()
     try:
         responses: list[ModbusPDU] = []
         current_address = register
@@ -598,7 +653,8 @@ async def modbus_write_registers(
                 ) from e
             return None
     finally:
-        client.close()
+        if manage_connection:
+            client.close()
     registers: list[int] = []
     for response in responses:
         if response.isError():
@@ -632,6 +688,7 @@ async def modbus_write_register(
     logger: logging.Logger | None = None,
     no_response_expected: bool = False,
     raise_on_error: bool = True,
+    manage_connection: bool = True,
 ) -> int | None:
     """
     Writes a value to Modbus holding register asynchronously using the provided
@@ -658,6 +715,9 @@ async def modbus_write_register(
         raise_on_error (bool, optional):
             If True, raises `ModbusOperationError` on failure instead of returning None.
             Defaults to True. Pass False to restore the legacy `None`-returning behavior.
+        manage_connection (bool, optional):
+            If True, connects before writing and closes after. Defaults to True. Pass False when
+            the client is managed by a surrounding ``modbus_connection`` context.
 
     Returns:
         int | None:
@@ -682,7 +742,8 @@ async def modbus_write_register(
     """
     if logger:
         logger.debug("%s: Writing payload to register %i", client.comm_params.comm_name, register)
-    await client.connect()
+    if manage_connection:
+        await client.connect()
     try:
         response = await client.write_register(
             register,
@@ -691,7 +752,8 @@ async def modbus_write_register(
             no_response_expected=no_response_expected,
         )
     except ModbusException as e:
-        client.close()
+        if manage_connection:
+            client.close()
         if not no_response_expected:
             if logger:
                 logger.error(
@@ -704,7 +766,8 @@ async def modbus_write_register(
                     f"{client.comm_params.comm_name}: Modbus exception on write register: {e}"
                 ) from e
         return None
-    client.close()
+    if manage_connection:
+        client.close()
     if no_response_expected:
         return None
     if response.isError():
