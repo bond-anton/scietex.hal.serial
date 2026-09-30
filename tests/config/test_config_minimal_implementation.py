@@ -3,15 +3,26 @@
 import pytest
 
 try:
+    from src.scietex.hal.serial.config.defaults import (
+        DEFAULT_BAUDRATE,
+        DEFAULT_BAUDRATE_LIST,
+        DEFAULT_BYTESIZE,
+        DEFAULT_BYTESIZE_LIST,
+        DEFAULT_PARITY,
+        DEFAULT_PARITY_LIST,
+        DEFAULT_STOPBITS,
+        DEFAULT_STOPBITS_LIST,
+    )
     from src.scietex.hal.serial.config.exceptions import (
         SerialConnectionConfigError,
     )
     from src.scietex.hal.serial.config.serial_connection_implementation import (
         SerialConnectionMinimalConfig as Config,
     )
-    from src.scietex.hal.serial.config.defaults import (
-        DEFAULT_BAUDRATE_LIST,
+except ModuleNotFoundError:
+    from scietex.hal.serial.config.defaults import (
         DEFAULT_BAUDRATE,
+        DEFAULT_BAUDRATE_LIST,
         DEFAULT_BYTESIZE,
         DEFAULT_BYTESIZE_LIST,
         DEFAULT_PARITY,
@@ -19,22 +30,11 @@ try:
         DEFAULT_STOPBITS,
         DEFAULT_STOPBITS_LIST,
     )
-except ModuleNotFoundError:
     from scietex.hal.serial.config.exceptions import (
         SerialConnectionConfigError,
     )
     from scietex.hal.serial.config.serial_connection_implementation import (
         SerialConnectionMinimalConfig as Config,
-    )
-    from scietex.hal.serial.config.defaults import (
-        DEFAULT_BAUDRATE_LIST,
-        DEFAULT_BAUDRATE,
-        DEFAULT_BYTESIZE,
-        DEFAULT_BYTESIZE_LIST,
-        DEFAULT_PARITY,
-        DEFAULT_PARITY_LIST,
-        DEFAULT_STOPBITS,
-        DEFAULT_STOPBITS_LIST,
     )
 
 

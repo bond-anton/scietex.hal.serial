@@ -30,14 +30,15 @@ focus on higher-level tasks such as retrieving or updating device states.
 """
 
 import logging
-from pymodbus import ModbusException, FramerType
-from pymodbus.pdu import ModbusPDU, DecodePDU
-from pymodbus.framer import FRAMER_NAME_TO_CLASS, FramerBase
-from pymodbus.transaction import TransactionManager
+
+from pymodbus import FramerType, ModbusException
 from pymodbus.client import AsyncModbusSerialClient
+from pymodbus.framer import FRAMER_NAME_TO_CLASS, FramerBase
+from pymodbus.pdu import DecodePDU, ModbusPDU
+from pymodbus.transaction import TransactionManager
 
 from ..config import SerialConnectionMinimalConfigModel
-from ..config.defaults import DEFAULT_TIMEOUT, DEFAULT_FRAMER
+from ..config.defaults import DEFAULT_FRAMER, DEFAULT_TIMEOUT
 from .exceptions import ModbusOperationError
 
 
@@ -140,9 +141,7 @@ def modbus_get_client(
     if custom_framer:
         framer_instance = custom_framer(decoder)
     else:
-        framer_instance = (FRAMER_NAME_TO_CLASS[modbus_params["framer"]])(
-            DecodePDU(False)
-        )
+        framer_instance = (FRAMER_NAME_TO_CLASS[modbus_params["framer"]])(DecodePDU(False))
     client.ctx = TransactionManager(
         client.comm_params,
         framer_instance,
@@ -367,9 +366,7 @@ async def modbus_read_registers(
     if registers:
         return registers
     if raise_on_error:
-        raise ModbusOperationError(
-            f"{client.comm_params.comm_name}: No registers returned"
-        )
+        raise ModbusOperationError(f"{client.comm_params.comm_name}: No registers returned")
     return None
 
 
@@ -690,9 +687,7 @@ async def modbus_write_register(
           value.
     """
     if logger:
-        logger.debug(
-            "%s: Writing payload to register %i", client.comm_params.comm_name, register
-        )
+        logger.debug("%s: Writing payload to register %i", client.comm_params.comm_name, register)
     await client.connect()
     try:
         response = await client.write_register(
@@ -733,7 +728,5 @@ async def modbus_write_register(
     if hasattr(response, "registers"):
         return response.registers[0]
     if raise_on_error:
-        raise ModbusOperationError(
-            f"{client.comm_params.comm_name}: No register written"
-        )
+        raise ModbusOperationError(f"{client.comm_params.comm_name}: No register written")
     return None

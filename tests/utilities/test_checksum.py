@@ -3,9 +3,9 @@
 import pytest
 
 try:
-    from src.scietex.hal.serial.utilities.checksum import check_sum, lrc, check_lrc
+    from src.scietex.hal.serial.utilities.checksum import check_lrc, check_sum, lrc
 except ModuleNotFoundError:
-    from scietex.hal.serial.utilities.checksum import check_sum, lrc, check_lrc
+    from scietex.hal.serial.utilities.checksum import check_lrc, check_sum, lrc
 
 
 def test_check_sum():

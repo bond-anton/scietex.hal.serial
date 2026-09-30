@@ -3,56 +3,56 @@
 import pytest
 
 try:
+    from src.scietex.hal.serial.config.defaults import (
+        DEFAULT_BAUDRATE,
+        DEFAULT_BAUDRATE_LIST,
+        DEFAULT_BYTESIZE,
+        DEFAULT_BYTESIZE_LIST,
+        DEFAULT_FRAMER,
+        DEFAULT_FRAMER_LIST,
+        DEFAULT_PARITY,
+        DEFAULT_PARITY_LIST,
+        DEFAULT_STOPBITS,
+        DEFAULT_STOPBITS_LIST,
+        DEFAULT_TIMEOUT,
+    )
     from src.scietex.hal.serial.config.exceptions import (
         SerialConnectionConfigError,
     )
     from src.scietex.hal.serial.config.validation import (
-        validate_port,
         validate_baudrate,
         validate_bytesize,
+        validate_framer,
         validate_parity,
+        validate_port,
         validate_stopbits,
         validate_timeout,
-        validate_framer,
     )
-    from src.scietex.hal.serial.config.defaults import (
-        DEFAULT_BAUDRATE_LIST,
+except ModuleNotFoundError:
+    from scietex.hal.serial.config.defaults import (
         DEFAULT_BAUDRATE,
+        DEFAULT_BAUDRATE_LIST,
         DEFAULT_BYTESIZE,
         DEFAULT_BYTESIZE_LIST,
+        DEFAULT_FRAMER,
+        DEFAULT_FRAMER_LIST,
         DEFAULT_PARITY,
         DEFAULT_PARITY_LIST,
         DEFAULT_STOPBITS,
         DEFAULT_STOPBITS_LIST,
         DEFAULT_TIMEOUT,
-        DEFAULT_FRAMER,
-        DEFAULT_FRAMER_LIST,
     )
-except ModuleNotFoundError:
     from scietex.hal.serial.config.exceptions import (
         SerialConnectionConfigError,
     )
     from scietex.hal.serial.config.validation import (
-        validate_port,
         validate_baudrate,
         validate_bytesize,
+        validate_framer,
         validate_parity,
+        validate_port,
         validate_stopbits,
         validate_timeout,
-        validate_framer,
-    )
-    from scietex.hal.serial.config.defaults import (
-        DEFAULT_BAUDRATE_LIST,
-        DEFAULT_BAUDRATE,
-        DEFAULT_BYTESIZE,
-        DEFAULT_BYTESIZE_LIST,
-        DEFAULT_PARITY,
-        DEFAULT_PARITY_LIST,
-        DEFAULT_STOPBITS,
-        DEFAULT_STOPBITS_LIST,
-        DEFAULT_TIMEOUT,
-        DEFAULT_FRAMER,
-        DEFAULT_FRAMER_LIST,
     )
 
 

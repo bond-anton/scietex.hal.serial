@@ -60,9 +60,7 @@ def test_generate_serial_pair():
     response = parent_conn.recv()
     assert response["status"] == "EXIST"
 
-    parent_conn.send(
-        {"cmd": "add", "payload": [{"port": "/dev/unknown_serial_port_1"}]}
-    )
+    parent_conn.send({"cmd": "add", "payload": [{"port": "/dev/unknown_serial_port_1"}]})
     response = parent_conn.recv()
     assert response["status"] == "ERROR"
 
@@ -100,9 +98,7 @@ def test_communication_thread():
     parent_conn, child_conn = Pipe()
     serial_ports = [None, None, None]
 
-    thread = threading.Thread(
-        target=create_serial_network, args=(child_conn, 3, None, False)
-    )
+    thread = threading.Thread(target=create_serial_network, args=(child_conn, 3, None, False))
     thread.start()
 
     for i in range(3):
@@ -112,9 +108,7 @@ def test_communication_thread():
     parent_conn2, child_conn2 = Pipe()
     serial_ports2 = [None, None]
 
-    thread2 = threading.Thread(
-        target=create_serial_network, args=(child_conn2, 2, None, False)
-    )
+    thread2 = threading.Thread(target=create_serial_network, args=(child_conn2, 2, None, False))
     thread2.start()
 
     for i in range(2):

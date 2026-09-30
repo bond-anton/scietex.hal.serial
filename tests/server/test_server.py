@@ -2,26 +2,23 @@
 
 from logging import Logger
 
+import pytest
 from pymodbus.client import AsyncModbusSerialClient
 
-import pytest
-
 try:
-    from src.scietex.hal.serial.utilities.modbus import modbus_connection_config
     from src.scietex.hal.serial.config import (
         ModbusSerialConnectionConfig as Config,
     )
-    from src.scietex.hal.serial.server.rs485_server import RS485Server, SERVER_INFO
+    from src.scietex.hal.serial.server.rs485_server import SERVER_INFO, RS485Server
+    from src.scietex.hal.serial.utilities.modbus import modbus_connection_config
 except ModuleNotFoundError:
-    from scietex.hal.serial.utilities.modbus import modbus_connection_config
     from scietex.hal.serial.config import ModbusSerialConnectionConfig as Config
-    from scietex.hal.serial.server.rs485_server import RS485Server, SERVER_INFO
+    from scietex.hal.serial.server.rs485_server import SERVER_INFO, RS485Server
+    from scietex.hal.serial.utilities.modbus import modbus_connection_config
 
 
 @pytest.mark.asyncio
-async def test_initialization(
-    logger_fixture, single_slave_fixture, store_fixture
-):  # pylint: disable=redefined-outer-name
+async def test_initialization(logger_fixture, single_slave_fixture, store_fixture):  # pylint: disable=redefined-outer-name
     """Test that the RS485Server initializes correctly."""
     # Test initialization without a logger
     config = Config("COM1", timeout=None)
@@ -50,9 +47,7 @@ async def test_initialization(
 
 
 @pytest.mark.asyncio
-async def test_start_stop_restart(
-    logger_fixture, server_config
-):  # pylint: disable=redefined-outer-name
+async def test_start_stop_restart(logger_fixture, server_config):  # pylint: disable=redefined-outer-name
     """Test that the start(), stop(), and stop() methods work correctly."""
 
     server = RS485Server(server_config, logger=logger_fixture)
@@ -76,9 +71,7 @@ async def test_start_stop_restart(
 
 
 @pytest.mark.asyncio
-async def test_update_slaves(
-    rs485_srv, store_fixture
-):  # pylint: disable=redefined-outer-name
+async def test_update_slaves(rs485_srv, store_fixture):  # pylint: disable=redefined-outer-name
     """Test update devices."""
     await rs485_srv.start()
     await rs485_srv.remove_slave(1)
@@ -91,9 +84,7 @@ async def test_update_slaves(
 
 
 @pytest.mark.asyncio
-async def test_read_registers(
-    rs485_srv, client_config
-):  # pylint: disable=redefined-outer-name
+async def test_read_registers(rs485_srv, client_config):  # pylint: disable=redefined-outer-name
     """Test read registers."""
     await rs485_srv.start()
     client = AsyncModbusSerialClient(**modbus_connection_config(client_config))
@@ -115,9 +106,7 @@ async def test_read_registers(
 
 
 @pytest.mark.asyncio
-async def test_write_registers(
-    rs485_srv, client_config
-):  # pylint: disable=redefined-outer-name
+async def test_write_registers(rs485_srv, client_config):  # pylint: disable=redefined-outer-name
     """Test write registers."""
     await rs485_srv.start()
     client = AsyncModbusSerialClient(**modbus_connection_config(client_config))

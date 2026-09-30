@@ -3,7 +3,7 @@
 import logging
 import time
 
-from scietex.hal.serial import VirtualSerialNetwork, SerialConnectionConfig
+from scietex.hal.serial import SerialConnectionConfig, VirtualSerialNetwork
 
 # pylint: disable=duplicate-code
 
@@ -38,9 +38,7 @@ def get_colored_logger(name, level=logging.DEBUG):
             return f"{color}{msg}\x1b[0m"
 
     handler.setFormatter(
-        ColorFormatter(
-            "%(asctime)s %(levelname)8s %(name)s → %(message)s", datefmt="%H:%M:%S"
-        )
+        ColorFormatter("%(asctime)s %(levelname)8s %(name)s → %(message)s", datefmt="%H:%M:%S")
     )
 
     data_logger.addHandler(handler)

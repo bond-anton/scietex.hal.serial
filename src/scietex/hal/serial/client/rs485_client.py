@@ -14,38 +14,37 @@ This module simplifies interaction with Modbus devices over RS485, making it eas
 with industrial automation systems and IoT applications.
 """
 
-from typing import Any
 from logging import Logger, getLogger
+from typing import Any
 
-from pymodbus.pdu import ModbusPDU, DecodePDU
-from pymodbus.framer import FramerBase
 from pymodbus.client import AsyncModbusSerialClient
+from pymodbus.framer import FramerBase
+from pymodbus.pdu import DecodePDU, ModbusPDU
 
 from ..config import (
-    SerialConnectionConfigModel,
     ModbusSerialConnectionConfigModel,
-)
-from ..utilities.modbus import (
-    modbus_get_client,
-    modbus_execute,
-    modbus_read_registers,
-    modbus_write_registers,
-    modbus_write_register,
+    SerialConnectionConfigModel,
 )
 from ..utilities.exceptions import ModbusOperationError
-
+from ..utilities.modbus import (
+    modbus_execute,
+    modbus_get_client,
+    modbus_read_registers,
+    modbus_write_register,
+    modbus_write_registers,
+)
 from ..utilities.numeric import (
     ByteOrder,
-    to_signed16,
-    from_signed16,
-    to_signed32,
-    from_signed32,
+    combine_32bit,
     float_from_int,
-    float_to_unsigned16,
     float_from_unsigned16,
     float_from_unsigned32,
-    combine_32bit,
+    float_to_unsigned16,
+    from_signed16,
+    from_signed32,
     split_32bit,
+    to_signed16,
+    to_signed32,
 )
 
 
@@ -107,9 +106,9 @@ class RS485Client:
         write_chunk_size: int | None = None,
         logger: Logger | None = None,
     ):
-        self._con_params: (
-            SerialConnectionConfigModel | ModbusSerialConnectionConfigModel
-        ) = con_params
+        self._con_params: SerialConnectionConfigModel | ModbusSerialConnectionConfigModel = (
+            con_params
+        )
         self._custom_framer = custom_framer
         self._custom_decoder = custom_decoder
         self._custom_response = custom_response
@@ -411,9 +410,7 @@ class RS485Client:
             return response
         if no_response_expected:
             return None
-        return await self.read_register(
-            register, holding=True, signed=signed, raise_on_error=False
-        )
+        return await self.read_register(register, holding=True, signed=signed, raise_on_error=False)
 
     async def read_register_float(
         self,
@@ -502,9 +499,7 @@ class RS485Client:
             return float_from_int(response, factor)
         if no_response_expected:
             return None
-        return await self.read_register_float(
-            register, factor, signed=signed, raise_on_error=False
-        )
+        return await self.read_register_float(register, factor, signed=signed, raise_on_error=False)
 
     async def read_two_registers_int(
         self,

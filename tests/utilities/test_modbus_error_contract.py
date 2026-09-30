@@ -12,8 +12,8 @@ try:
     from src.scietex.hal.serial.utilities.modbus import (
         modbus_get_client,
         modbus_read_registers,
-        modbus_write_registers,
         modbus_write_register,
+        modbus_write_registers,
     )
 except ModuleNotFoundError:
     from scietex.hal.serial import ModbusOperationError as TopLevelError
@@ -23,8 +23,8 @@ except ModuleNotFoundError:
     from scietex.hal.serial.utilities.modbus import (
         modbus_get_client,
         modbus_read_registers,
-        modbus_write_registers,
         modbus_write_register,
+        modbus_write_registers,
     )
 
 
@@ -125,25 +125,17 @@ async def test_client_write_registers_returns_none_when_raise_on_error_false() -
 
 
 @pytest.mark.asyncio
-async def test_client_write_registers_fallback_reads_back_when_raise_on_error_false() -> (
-    None
-):
+async def test_client_write_registers_fallback_reads_back_when_raise_on_error_false() -> None:
     """``raise_on_error=False`` fires the write->read fallback and returns the read result."""
     client = RS485Client(_client_config())
-    with patch.object(
-        client, "read_registers", new=AsyncMock(return_value=[1, 2, 3])
-    ) as mock_read:
+    with patch.object(client, "read_registers", new=AsyncMock(return_value=[1, 2, 3])) as mock_read:
         result = await client.write_registers(0, [1, 2, 3], raise_on_error=False)
     assert result == [1, 2, 3]
-    mock_read.assert_awaited_once_with(
-        0, count=3, holding=True, signed=False, raise_on_error=False
-    )
+    mock_read.assert_awaited_once_with(0, count=3, holding=True, signed=False, raise_on_error=False)
 
 
 @pytest.mark.asyncio
-async def test_client_read_success_with_raise_on_error(
-    rs485_srv, client_config
-):  # pylint: disable=redefined-outer-name
+async def test_client_read_success_with_raise_on_error(rs485_srv, client_config):  # pylint: disable=redefined-outer-name
     """``raise_on_error=True`` returns the value on a successful read instead of raising."""
     await rs485_srv.start()
     client = RS485Client(client_config)
@@ -154,9 +146,7 @@ async def test_client_read_success_with_raise_on_error(
 
 
 @pytest.mark.asyncio
-async def test_client_write_success_with_raise_on_error(
-    rs485_srv, client_config
-):  # pylint: disable=redefined-outer-name
+async def test_client_write_success_with_raise_on_error(rs485_srv, client_config):  # pylint: disable=redefined-outer-name
     """``raise_on_error=True`` returns the value on a successful write instead of raising."""
     await rs485_srv.start()
     client = RS485Client(client_config)
@@ -167,9 +157,7 @@ async def test_client_write_success_with_raise_on_error(
 
 
 @pytest.mark.asyncio
-async def test_modbus_write_register_no_response_expected_connected(
-    rs485_srv, client_config
-):  # pylint: disable=redefined-outer-name
+async def test_modbus_write_register_no_response_expected_connected(rs485_srv, client_config):  # pylint: disable=redefined-outer-name
     """A no-response write against a live server returns None instead of crashing."""
     await rs485_srv.start()
     client = modbus_get_client(client_config)

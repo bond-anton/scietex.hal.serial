@@ -1,6 +1,6 @@
 """Example of SerialConnectionConfig class usage."""
 
-from scietex.hal.serial import SerialConnectionConfig, ModbusSerialConnectionConfig
+from scietex.hal.serial import ModbusSerialConnectionConfig, SerialConnectionConfig
 
 ser_conf = SerialConnectionConfig(port="/dev/ttyS01")
 ser_conf.baudrate = 9600

@@ -39,9 +39,7 @@ ser_conf.baudrate = 9600
 For serialization purposes, you can convert the configuration to a dictionary:
 
 ```python
-from scietex.hal.serial import (
-  SerialConnectionConfig, ModbusSerialConnectionConfig
-)
+from scietex.hal.serial import SerialConnectionConfig, ModbusSerialConnectionConfig
 
 ser_conf = SerialConnectionConfig(port="/dev/ttyS01")
 ser_conf.baudrate = 9600
@@ -82,9 +80,7 @@ if __name__ == "__main__":
     vsn2 = VirtualSerialNetwork(virtual_ports_num=2)
     vsn2.start()
 
-    vsn2.add(
-        [SerialConnectionConfig(vsn1.serial_ports[0])]
-    )
+    vsn2.add([SerialConnectionConfig(vsn1.serial_ports[0])])
 
     # Create two more virtual ports
     vsn1.create(2)
@@ -121,7 +117,13 @@ you can provide a label for enhanced logging readability:
 
 ```python
 import asyncio
-from scietex.hal.serial import VirtualSerialPair, RS485Server, RS485Client, ModbusSerialConnectionConfig
+from scietex.hal.serial import (
+    VirtualSerialPair,
+    RS485Server,
+    RS485Client,
+    ModbusSerialConnectionConfig,
+)
+
 
 async def main():
     vsp = VirtualSerialPair()
@@ -146,6 +148,7 @@ async def main():
 
     await server.stop()
     vsp.stop()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
