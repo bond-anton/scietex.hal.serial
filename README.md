@@ -13,7 +13,7 @@ The package is structured into four main modules, each serving a distinct purpos
 
 ## System Requirements
 
-- **Python**: 3.9 or higher.
+- **Python**: 3.10 or higher.
 - **Operating Systems**: Compatible with **Linux** and **macOS**.
 
 ## Installation

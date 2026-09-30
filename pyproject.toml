@@ -12,7 +12,7 @@ readme = "README.md"
 classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: MIT License",
-  "Operating System :: OS Independent",
+  "Operating System :: POSIX",
 ]
 requires-python = ">=3.10"
 dependencies = ["pymodbus[serial] ~= 3.12"]
@@ -30,6 +30,7 @@ test = [
     "pytest-timeout>=2.4.0",
 ]
 lint = ["pylint"]
+all = ["scietex.hal.serial[dev,test,lint]"]
 
 [tool.setuptools.dynamic]
 version = { attr = "scietex.hal.serial.version.__version__" }
@@ -42,6 +43,3 @@ where = ["src"]
 
 [tool.mypy]
 python_version = "3.10"
-
-[tool.pytest.ini_options]
-pythonpath = ["src"]

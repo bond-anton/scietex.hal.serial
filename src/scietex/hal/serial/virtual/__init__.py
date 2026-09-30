@@ -14,7 +14,7 @@ Exported Classes:
 Usage:
     To create and manage a virtual serial network:
     ```python
-    from virtual import VirtualSerialNetwork
+    from scietex.hal.serial.virtual import VirtualSerialNetwork
 
     vsn = VirtualSerialNetwork(virtual_ports_num=2)
     vsn.start()
@@ -22,7 +22,7 @@ Usage:
 
     To create a pair of virtual serial ports:
     ```python
-    from virtual import VirtualSerialPair
+    from scietex.hal.serial.virtual import VirtualSerialPair
 
     vsp = VirtualSerialPair()
     vsp.start()

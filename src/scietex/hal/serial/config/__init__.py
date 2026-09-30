@@ -33,7 +33,7 @@ Classes:
       with Modbus-specific configuration options.
 
 Attributes:
-    - port (str): The serial port identifier (e.g., "COM1" on Windows, "/dev/ttyUSB0" on Linux).
+    - port (str): The serial port identifier (e.g., "/dev/ttyUSB0" on Linux).
     - baudrate (int): Baud rate for serial communication (default is 9600).
     - bytesize (int): Number of payload bits per character (default is 8).
     - parity (str): Parity checking mode ('N', 'E', 'O', 'M', 'S'; default is 'N' for no parity).
