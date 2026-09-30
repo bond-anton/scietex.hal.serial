@@ -27,9 +27,15 @@ test = [
     "pytest",
     "pytest-asyncio",
     "pytest-timeout>=2.4.0",
+    "pytest-xdist",
 ]
 lint = ["ruff", "ty"]
 all = ["scietex.hal.serial[dev,test,lint]"]
+
+[tool.coverage.run]
+source = ["src"]
+concurrency = ["multiprocessing"]
+parallel = true
 
 [tool.setuptools.dynamic]
 version = { attr = "scietex.hal.serial.version.__version__" }
