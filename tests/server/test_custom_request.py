@@ -254,7 +254,6 @@ def test_custom_framer():
 
 
 @pytest.mark.asyncio
-# pylint: disable=redefined-outer-name
 async def test_custom_request_client(vsp_fixture):
     """Test client and server with custom framer and request."""
     server_config = Config(vsp_fixture.serial_ports[0])

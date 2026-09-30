@@ -8,7 +8,6 @@ except ModuleNotFoundError:
     from scietex.hal.serial.client import RS485Client
 
 
-# pylint: disable=redefined-outer-name
 @pytest.mark.asyncio
 async def test_async_context_manager(client_config, logger_fixture) -> None:
     """Test that the client works as an async context manager and closes on exit."""
@@ -17,7 +16,6 @@ async def test_async_context_manager(client_config, logger_fixture) -> None:
     assert not client.client.connected
 
 
-# pylint: disable=redefined-outer-name
 @pytest.mark.asyncio
 async def test_close_does_not_raise(client_config, logger_fixture) -> None:
     """Test that calling close directly does not raise."""

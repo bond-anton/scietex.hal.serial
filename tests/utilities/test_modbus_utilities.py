@@ -84,7 +84,7 @@ def test_client_config() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_client(client_config):  # pylint: disable=redefined-outer-name
+async def test_get_client(client_config):
     """Test modbus_get_client function."""
 
     client = modbus_get_client(
@@ -104,7 +104,7 @@ async def test_get_client(client_config):  # pylint: disable=redefined-outer-nam
 
 
 @pytest.mark.asyncio
-async def test_read_input_registers(rs485_srv, client_config, logger_fixture, store_fixture):  # pylint: disable=redefined-outer-name
+async def test_read_input_registers(rs485_srv, client_config, logger_fixture, store_fixture):
     """Read input registers via both the specific and the generic helper."""
     await rs485_srv.start()
     await rs485_srv.update_slave(2, store_fixture)
@@ -133,7 +133,7 @@ async def test_read_input_registers(rs485_srv, client_config, logger_fixture, st
 
 
 @pytest.mark.asyncio
-async def test_read_holding_registers(rs485_srv, client_config, logger_fixture, store_fixture):  # pylint: disable=redefined-outer-name
+async def test_read_holding_registers(rs485_srv, client_config, logger_fixture, store_fixture):
     """Read holding registers via both the specific and the generic helper."""
     await rs485_srv.start()
     await rs485_srv.update_slave(2, store_fixture)
@@ -162,7 +162,7 @@ async def test_read_holding_registers(rs485_srv, client_config, logger_fixture, 
 
 
 @pytest.mark.asyncio
-async def test_read_registers_server_down(rs485_srv, client_config, logger_fixture):  # pylint: disable=redefined-outer-name
+async def test_read_registers_server_down(rs485_srv, client_config, logger_fixture):
     """A read against a stopped server returns None when raise_on_error is False."""
     await rs485_srv.start()
     client = modbus_get_client(client_config)
@@ -180,7 +180,7 @@ async def test_read_registers_server_down(rs485_srv, client_config, logger_fixtu
 
 
 @pytest.mark.asyncio
-async def test_read_registers_vsp_down(rs485_srv, client_config, logger_fixture, vsp_fixture):  # pylint: disable=redefined-outer-name
+async def test_read_registers_vsp_down(rs485_srv, client_config, logger_fixture, vsp_fixture):
     """A read against a stopped virtual serial network returns None."""
     await rs485_srv.start()
     client = modbus_get_client(client_config)
@@ -199,7 +199,7 @@ async def test_read_registers_vsp_down(rs485_srv, client_config, logger_fixture,
 
 
 @pytest.mark.asyncio
-async def test_read_registers_after_restart(rs485_srv, client_config, logger_fixture):  # pylint: disable=redefined-outer-name
+async def test_read_registers_after_restart(rs485_srv, client_config, logger_fixture):
     """Reads recover after the server is restarted."""
     await rs485_srv.start()
     client = modbus_get_client(client_config)
@@ -219,7 +219,7 @@ async def test_read_registers_after_restart(rs485_srv, client_config, logger_fix
 
 
 @pytest.mark.asyncio
-async def test_write_registers(rs485_srv, client_config, logger_fixture):  # pylint: disable=redefined-outer-name
+async def test_write_registers(rs485_srv, client_config, logger_fixture):
     """Write multiple registers and read them back."""
     await rs485_srv.start()
     client = modbus_get_client(client_config)
@@ -254,7 +254,7 @@ async def test_write_registers(rs485_srv, client_config, logger_fixture):  # pyl
 
 
 @pytest.mark.asyncio
-async def test_write_registers_unknown_device(rs485_srv, client_config, logger_fixture):  # pylint: disable=redefined-outer-name
+async def test_write_registers_unknown_device(rs485_srv, client_config, logger_fixture):
     """Writing to an unregistered device returns None when raise_on_error is False."""
     await rs485_srv.start()
     client = modbus_get_client(client_config)
@@ -273,7 +273,7 @@ async def test_write_registers_unknown_device(rs485_srv, client_config, logger_f
 
 
 @pytest.mark.asyncio
-async def test_write_register(rs485_srv, client_config, logger_fixture):  # pylint: disable=redefined-outer-name
+async def test_write_register(rs485_srv, client_config, logger_fixture):
     """Write a single register and read it back."""
     await rs485_srv.start()
     client = modbus_get_client(client_config)
@@ -307,7 +307,7 @@ async def test_write_register(rs485_srv, client_config, logger_fixture):  # pyli
 
 
 @pytest.mark.asyncio
-async def test_write_register_unknown_device(rs485_srv, client_config, logger_fixture):  # pylint: disable=redefined-outer-name
+async def test_write_register_unknown_device(rs485_srv, client_config, logger_fixture):
     """Writing a single register to an unregistered device returns None."""
     await rs485_srv.start()
     client = modbus_get_client(client_config)

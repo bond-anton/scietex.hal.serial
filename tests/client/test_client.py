@@ -17,7 +17,6 @@ except ModuleNotFoundError:
     from scietex.hal.serial.utilities.numeric import ByteOrder
 
 
-# pylint: disable=redefined-outer-name
 @pytest.mark.asyncio
 async def test_client_init(client_config, logger_fixture) -> None:
     """
@@ -35,7 +34,7 @@ async def test_client_init(client_config, logger_fixture) -> None:
 
 
 @pytest.mark.asyncio
-async def test_read_registers(rs485_srv, client_config, logger_fixture):  # pylint: disable=redefined-outer-name
+async def test_read_registers(rs485_srv, client_config, logger_fixture):
     """Test reading registers."""
     await rs485_srv.start()
     client = RS485Client(client_config, address=1, label="MY DEV", logger=logger_fixture)
@@ -114,7 +113,7 @@ async def test_read_registers(rs485_srv, client_config, logger_fixture):  # pyli
 
 
 @pytest.mark.asyncio
-async def test_write_registers(rs485_srv, client_config, logger_fixture):  # pylint: disable=redefined-outer-name
+async def test_write_registers(rs485_srv, client_config, logger_fixture):
     """Test writing registers."""
     await rs485_srv.start()
     client = RS485Client(client_config, logger=logger_fixture)
@@ -175,7 +174,7 @@ async def test_write_registers(rs485_srv, client_config, logger_fixture):  # pyl
 
 
 @pytest.mark.asyncio
-async def test_write_registers_default_path(rs485_srv, client_config):  # pylint: disable=redefined-outer-name
+async def test_write_registers_default_path(rs485_srv, client_config):
     """Default path: a multi-register write (FC16) returns the written values, no raise."""
     await rs485_srv.start()
     client = RS485Client(client_config)
@@ -186,7 +185,7 @@ async def test_write_registers_default_path(rs485_srv, client_config):  # pylint
 
 
 @pytest.mark.asyncio
-async def test_write_two_registers_default_path(rs485_srv, client_config):  # pylint: disable=redefined-outer-name
+async def test_write_two_registers_default_path(rs485_srv, client_config):
     """Default path: a two-register write returns the written value, no raise."""
     await rs485_srv.start()
     client = RS485Client(client_config)
@@ -197,7 +196,7 @@ async def test_write_two_registers_default_path(rs485_srv, client_config):  # py
 
 
 @pytest.mark.asyncio
-async def test_write_register_zero_default_path(rs485_srv, client_config):  # pylint: disable=redefined-outer-name
+async def test_write_register_zero_default_path(rs485_srv, client_config):
     """Default path: writing a zero value returns 0 instead of a spurious error."""
     await rs485_srv.start()
     client = RS485Client(client_config)
@@ -210,7 +209,7 @@ async def test_write_register_zero_default_path(rs485_srv, client_config):  # py
 
 
 @pytest.mark.asyncio
-async def test_read_register_float_zero_default_path(rs485_srv, client_config):  # pylint: disable=redefined-outer-name
+async def test_read_register_float_zero_default_path(rs485_srv, client_config):
     """Default path: a register holding 0 reads back as 0.0, not None."""
     await rs485_srv.start()
     client = RS485Client(client_config)

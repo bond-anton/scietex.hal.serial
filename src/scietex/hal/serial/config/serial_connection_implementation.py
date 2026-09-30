@@ -99,7 +99,6 @@ class SerialConnectionMinimalConfig(SerialConnectionMinimalConfigModel):
         to_dict() -> dict: Converts the serial connection config to a dictionary.
     """
 
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
     def __init__(
         self,
         port: str | None = None,
@@ -271,7 +270,6 @@ class SerialConnectionConfig(SerialConnectionMinimalConfig, SerialConnectionConf
         to_dict() -> dict: Converts the serial connection config to a dictionary.
     """
 
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
     def __init__(
         self,
         port: str | None = None,
@@ -410,7 +408,6 @@ class ModbusSerialConnectionConfig(
         to_dict() -> dict: Converts the serial connection config to a dictionary.
     """
 
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
     def __init__(
         self,
         port: str | None = None,

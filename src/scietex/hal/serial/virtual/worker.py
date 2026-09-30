@@ -47,7 +47,6 @@ from typing import BinaryIO
 from serial import Serial
 
 
-# pylint: disable=too-many-arguments, too-many-positional-arguments
 def generate_virtual_ports(
     stack: ExitStack,
     selector: Selector,
@@ -93,7 +92,6 @@ def generate_virtual_ports(
             tty.setraw(master_fd)
             os.set_blocking(master_fd, False)
             slave_name = os.ttyname(slave_fd)
-            # pylint: disable=consider-using-with
             master_files[master_fd] = open(master_fd, "r+b", buffering=0)
             master_cache[master_fd] = b""
             slave_names[slave_name] = master_fd
@@ -101,7 +99,6 @@ def generate_virtual_ports(
             selector.register(master_fd, EVENT_READ)
             _logger.debug("VSN: Worker: Successfully generated virtual port '%s'", slave_name)
             worker_io.send({"status": "OK", "payload": slave_name})
-        # pylint: disable=broad-exception-caught
         except Exception as e:
             _logger.debug("VSN: Worker: Failed to generate virtual port: %s", e)
             worker_io.send(
@@ -112,7 +109,6 @@ def generate_virtual_ports(
             )
 
 
-# pylint: disable=too-many-positional-arguments
 def add_external_ports(
     stack: ExitStack,
     selector: Selector,
@@ -168,7 +164,6 @@ def add_external_ports(
                     con_params["port"],
                 )
                 worker_io.send({"status": "OK", "payload": con_params["port"]})
-            # pylint: disable=broad-exception-caught
             except Exception as e:
                 _logger.warning(
                     "VSN: Worker: Failed to add external port '%s': %s",
@@ -229,7 +224,6 @@ def remove_ports(
                 del slave_names[slave_name]
                 _logger.debug("VSN: Worker: Successfully removed slave name '%s'", slave_name)
                 worker_io.send({"status": "OK", "payload": slave_name})
-            # pylint: disable=broad-exception-caught
             except Exception as e:
                 _logger.warning("VSN: Worker: Failed to remove slave name '%s': %s", slave_name, e)
                 worker_io.send(
@@ -275,7 +269,6 @@ def setup_data_logging(
     return logger
 
 
-# pylint: disable=too-many-locals, too-many-branches
 def forward_data(
     selector: Selector,
     master_files: dict,
@@ -320,7 +313,6 @@ def forward_data(
             backup_count=5,
             level=logging.DEBUG,
         )
-    # pylint: disable=too-many-nested-blocks
 
     for key, events in selector.select(timeout=1):
         key_fd = key.fileobj
@@ -362,11 +354,10 @@ def forward_data(
                 for fd, f in master_files.items():
                     if loopback or fd != key_fd:
                         f.write(data)
-            except Exception:  # pylint: disable=broad-exception-caught
+            except Exception:
                 _logger.debug("VSN: Worker: Failed to forward data from fd %s", key_fd)
 
 
-# pylint: disable=too-many-positional-arguments
 def process_cmd(
     stack: ExitStack,
     selector: Selector,
@@ -410,7 +401,6 @@ def process_cmd(
         message = worker_io.recv()
         try:
             command = message["cmd"].lower()
-        # pylint: disable=broad-exception-caught
         except Exception as e:
             worker_io.send(
                 {
@@ -495,7 +485,6 @@ def create_serial_network(
     Raises:
         SerialConnectionConfigError: If an error occurs during network creation.
     """
-    # pylint: disable=too-many-locals
     _logger: Logger = logger if isinstance(logger, Logger) else getLogger()
     keep_running: bool = True
 
@@ -550,7 +539,6 @@ def create_serial_network(
                     data_logging_file=data_logging_file,
                     data_logging_splitter=data_logging_splitter,
                 )
-    # pylint: disable=broad-exception-caught
     except Exception as e:
         _logger.error("VSN: Worker: Unexpected error: %s", e)
         try:

@@ -13,7 +13,6 @@ except ModuleNotFoundError:
     from scietex.hal.serial.virtual.exceptions import VirtualSerialNetworkError
 
 
-# pylint: disable=redefined-outer-name, protected-access
 def test_worker_death_raises_virtual_serial_network_error(logger_fixture):
     """A dead worker makes the next command raise VirtualSerialNetworkError."""
     vsn = VirtualSerialNetwork(virtual_ports_num=2, logger=logger_fixture)
@@ -30,7 +29,6 @@ def test_worker_death_raises_virtual_serial_network_error(logger_fixture):
         assert vsn._VirtualSerialNetwork__p is None
 
 
-# pylint: disable=redefined-outer-name, protected-access
 def test_mid_command_worker_death_raises(logger_fixture):
     """A worker killed mid-command makes the next command raise instead of hanging.
 
@@ -51,7 +49,6 @@ def test_mid_command_worker_death_raises(logger_fixture):
         assert vsn._VirtualSerialNetwork__p is None
 
 
-# pylint: disable=redefined-outer-name, protected-access
 def test_stop_tolerates_dead_worker(logger_fixture):
     """stop() completes without raising and clears the handle for a dead worker.
 

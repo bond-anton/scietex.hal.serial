@@ -90,7 +90,6 @@ def modbus_connection_config(con_params: SerialConnectionMinimalConfigModel) -> 
     return {k: params_dict[k] for k in keys}
 
 
-# pylint: disable=too-many-arguments, too-many-positional-arguments
 def modbus_get_client(
     con_params: SerialConnectionMinimalConfigModel,
     custom_framer: type[FramerBase] | None = None,
@@ -247,7 +246,6 @@ async def modbus_execute(
     return response
 
 
-# pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-branches
 async def modbus_read_registers(
     client: AsyncModbusSerialClient,
     start_register: int = 0,
@@ -370,7 +368,6 @@ async def modbus_read_registers(
     return None
 
 
-# pylint: disable=too-many-arguments, too-many-positional-arguments
 async def modbus_read_input_registers(
     client: AsyncModbusSerialClient,
     start_register: int = 0,
@@ -437,7 +434,6 @@ async def modbus_read_input_registers(
     )
 
 
-# pylint: disable=too-many-arguments, too-many-positional-arguments
 async def modbus_read_holding_registers(
     client: AsyncModbusSerialClient,
     start_register: int = 0,
@@ -504,7 +500,6 @@ async def modbus_read_holding_registers(
     )
 
 
-# pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-branches
 async def modbus_write_registers(
     client: AsyncModbusSerialClient,
     register: int,
@@ -629,7 +624,6 @@ async def modbus_write_registers(
     return value
 
 
-# pylint: disable=too-many-arguments, too-many-positional-arguments
 async def modbus_write_register(
     client: AsyncModbusSerialClient,
     register: int,

@@ -42,7 +42,6 @@ from .exceptions import VirtualSerialNetworkError
 from .worker import create_serial_network
 
 
-# pylint: disable=too-many-instance-attributes
 class VirtualSerialNetwork:
     """
     A virtual serial port network management.
@@ -77,7 +76,6 @@ class VirtualSerialNetwork:
         remove(self, remove_list: list[str]): Removes specified ports from the network.
     """
 
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
     def __init__(
         self,
         virtual_ports_num: int = 2,
@@ -125,7 +123,7 @@ class VirtualSerialNetwork:
                 Path(self.data_log_dir).mkdir(parents=True, exist_ok=True)
                 self.data_logging_file = str(Path(self.data_log_dir) / "vsn-data.log")
                 self.logger.info("VSN: Data logging enabled. Log file: %s", self.data_logging_file)
-            except Exception as e:  # pylint: disable=broad-exception-caught
+            except Exception as e:
                 self.logger.error(
                     "VSN: Failed to create data log directory: %s. Data logging disabled.",
                     e,

@@ -19,11 +19,10 @@ except ModuleNotFoundError:
     )
 
 
-def test_initialization(logger_fixture):  # pylint: disable=redefined-outer-name
+def test_initialization(logger_fixture):
     """Test that the VirtualSerialNetwork initializes correctly."""
     # Test initialization without a logger
     vsn = VirtualSerialNetwork()
-    # pylint: disable=protected-access
     assert vsn._VirtualSerialNetwork__master_io is None
     assert vsn._VirtualSerialNetwork__worker_io is None
     assert vsn._VirtualSerialNetwork__p is None
@@ -34,7 +33,7 @@ def test_initialization(logger_fixture):  # pylint: disable=redefined-outer-name
     assert isinstance(vsn_with_logger.logger, Logger)
 
 
-def test_start_stop(vsn_fixture):  # pylint: disable=redefined-outer-name
+def test_start_stop(vsn_fixture):
     """Test that the start() and stop() methods work correctly."""
     virtual_ports_num = 3
     # Verify that serial ports are created
@@ -44,7 +43,6 @@ def test_start_stop(vsn_fixture):  # pylint: disable=redefined-outer-name
         assert os.path.exists(vsn_fixture.serial_ports[i])
 
     # Verify that the process is running
-    # pylint: disable=protected-access
     assert vsn_fixture._VirtualSerialNetwork__p is not None
     assert vsn_fixture._VirtualSerialNetwork__p.is_alive()
 
@@ -52,12 +50,10 @@ def test_start_stop(vsn_fixture):  # pylint: disable=redefined-outer-name
     vsn_fixture.stop()
 
     # Verify that resources are cleaned up
-    # pylint: disable=protected-access
     assert vsn_fixture._VirtualSerialNetwork__p is None
     assert vsn_fixture.serial_ports == []
 
 
-# pylint: disable=redefined-outer-name
 def test_vsn_init_external_ports(vsn_fixture, logger_fixture):
     """Initialization with external ports list."""
     external_ports = [SerialConnectionConfig(port=vsn_fixture.serial_ports[0])]
@@ -76,7 +72,6 @@ def test_vsn_init_external_ports(vsn_fixture, logger_fixture):
     vsn2.stop()
 
 
-# pylint: disable=redefined-outer-name
 def test_vsn_add_external_ports(vsn_fixture, logger_fixture):
     """Initialization with external ports list."""
     external_ports = [SerialConnectionConfig(port=vsn_fixture.serial_ports[0])]
@@ -105,7 +100,6 @@ def test_vsn_add_external_ports(vsn_fixture, logger_fixture):
     vsn2.stop()
 
 
-# pylint: disable=redefined-outer-name
 def test_vsn_remove_ports(vsn_fixture, logger_fixture):
     """Initialization with external ports list."""
     external_port = vsn_fixture.serial_ports[0]
@@ -144,7 +138,7 @@ def test_vsn_remove_ports(vsn_fixture, logger_fixture):
     vsn2.stop()
 
 
-def test_create_virtual_ports(vsn_fixture):  # pylint: disable=redefined-outer-name
+def test_create_virtual_ports(vsn_fixture):
     """Test creation of additional virtual ports in the network."""
     assert vsn_fixture.virtual_ports_num == 3
     vsn_fixture.create(1)
@@ -159,7 +153,7 @@ def test_create_virtual_ports(vsn_fixture):  # pylint: disable=redefined-outer-n
     assert len(vsn_fixture.serial_ports) == vsn_fixture.virtual_ports_num
 
 
-def test_communication(logger_fixture):  # pylint: disable=redefined-outer-name
+def test_communication(logger_fixture):
     """Test that payload can be sent and received between the virtual serial ports."""
     vsn = VirtualSerialNetwork(virtual_ports_num=3, logger=logger_fixture)
     vsn.start()
@@ -185,7 +179,6 @@ def test_communication(logger_fixture):  # pylint: disable=redefined-outer-name
         vsn.stop()
 
 
-# pylint: disable=redefined-outer-name
 def test_communication_external_ports(vsn_fixture, logger_fixture):
     """Connect two virtual networks and test communication."""
     virtual_ports_num = 3
@@ -219,7 +212,7 @@ def test_communication_external_ports(vsn_fixture, logger_fixture):
         vsn.stop()
 
 
-def test_error_handling(logger_fixture):  # pylint: disable=redefined-outer-name
+def test_error_handling(logger_fixture):
     """Test that errors during pseudo-terminal creation are handled gracefully."""
     vsn = VirtualSerialNetwork(virtual_ports_num=3, logger=logger_fixture)
     assert vsn.virtual_ports_num == 3
@@ -229,13 +222,11 @@ def test_error_handling(logger_fixture):  # pylint: disable=redefined-outer-name
     assert vsn.virtual_ports_num == 0
     assert vsn.serial_ports == []
 
-    # pylint: disable=protected-access
     assert vsn._VirtualSerialNetwork__p is not None
     assert vsn._VirtualSerialNetwork__p.is_alive()
 
     vsn.stop()
     # Ensure that resources are cleaned up after the error
-    # pylint: disable=protected-access
     assert vsn._VirtualSerialNetwork__p is None
     assert vsn._VirtualSerialNetwork__master_io is None
     assert vsn._VirtualSerialNetwork__worker_io is None
