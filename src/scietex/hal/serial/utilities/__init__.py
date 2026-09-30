@@ -32,7 +32,12 @@ from .numeric import (
     to_signed16,
     to_signed32,
 )
-from .serial_port_finder import find_rs485, find_serial_ports, find_stm32_cdc
+from .serial_port_finder import (
+    DEVICE_PROFILES,
+    find_rs485,
+    find_serial_ports,
+    find_stm32_cdc,
+)
 
 __all__ = [
     "check_sum",
@@ -59,6 +64,7 @@ __all__ = [
     "modbus_read_holding_registers",
     "modbus_write_registers",
     "modbus_write_register",
+    "DEVICE_PROFILES",
     "find_serial_ports",
     "find_stm32_cdc",
     "find_rs485",
