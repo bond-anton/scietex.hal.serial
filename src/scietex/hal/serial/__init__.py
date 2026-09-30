@@ -15,6 +15,7 @@ from .utilities import (
     combine_32bit,
     find_serial_ports,
     lrc,
+    modbus_connection,
     modbus_get_client,
     split_32bit,
 )
@@ -38,6 +39,7 @@ __all__ = [
     "combine_32bit",
     "split_32bit",
     "modbus_get_client",
+    "modbus_connection",
     "find_serial_ports",
     "ModbusOperationError",
 ]

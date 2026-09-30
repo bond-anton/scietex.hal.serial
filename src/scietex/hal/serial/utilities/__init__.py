@@ -9,6 +9,7 @@ imported directly from :mod:`scietex.hal.serial.utilities`.
 from .checksum import check_lrc, check_sum, lrc
 from .exceptions import ModbusOperationError
 from .modbus import (
+    modbus_connection,
     modbus_connection_config,
     modbus_execute,
     modbus_get_client,
@@ -51,6 +52,7 @@ __all__ = [
     "float_from_unsigned32",
     "modbus_connection_config",
     "modbus_get_client",
+    "modbus_connection",
     "modbus_execute",
     "modbus_read_registers",
     "modbus_read_input_registers",
