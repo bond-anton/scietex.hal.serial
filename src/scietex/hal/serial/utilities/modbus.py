@@ -163,7 +163,7 @@ async def modbus_execute(
     request: ModbusPDU,
     no_response_expected: bool = False,
     logger: logging.Logger | None = None,
-    raise_on_error: bool = False,
+    raise_on_error: bool = True,
 ):
     """
     Executes a Modbus request asynchronously using the provided client and handles the response.
@@ -184,7 +184,7 @@ async def modbus_execute(
             no logging is performed.
         raise_on_error (bool, optional):
             If True, raises `ModbusOperationError` on failure instead of returning None.
-            Defaults to False.
+            Defaults to True. Pass False to restore the legacy `None`-returning behavior.
 
     Returns:
         ModbusPDU | None:
@@ -207,6 +207,8 @@ async def modbus_execute(
     """
     await client.connect()
     if not client.connected:
+        if no_response_expected:
+            return None
         if raise_on_error:
             raise ModbusOperationError(
                 f"{client.comm_params.comm_name}: Failed to connect to Modbus device"
@@ -215,16 +217,17 @@ async def modbus_execute(
     try:
         response = await client.execute(no_response_expected, request)
     except ModbusException as e:
-        if logger:
-            logger.error(
-                "%s: Modbus Exception on request execute %s",
-                client.comm_params.comm_name,
-                e,
-            )
-        if raise_on_error:
-            raise ModbusOperationError(
-                f"{client.comm_params.comm_name}: Modbus exception on request execute: {e}"
-            ) from e
+        if not no_response_expected:
+            if logger:
+                logger.error(
+                    "%s: Modbus Exception on request execute %s",
+                    client.comm_params.comm_name,
+                    e,
+                )
+            if raise_on_error:
+                raise ModbusOperationError(
+                    f"{client.comm_params.comm_name}: Modbus exception on request execute: {e}"
+                ) from e
         return None
     finally:
         client.close()
@@ -254,7 +257,7 @@ async def modbus_read_registers(
     holding: bool = True,
     max_count: int = 0,
     logger: logging.Logger | None = None,
-    raise_on_error: bool = False,
+    raise_on_error: bool = True,
 ) -> list[int] | None:
     """
     Reads a sequence of Modbus registers asynchronously using the provided client.
@@ -282,7 +285,7 @@ async def modbus_read_registers(
             no logging is performed.
         raise_on_error (bool, optional):
             If True, raises `ModbusOperationError` on failure instead of returning None.
-            Defaults to False.
+            Defaults to True. Pass False to restore the legacy `None`-returning behavior.
 
     Returns:
         list[int] | None:
@@ -378,7 +381,7 @@ async def modbus_read_input_registers(
     device_id: int = 1,
     max_count: int = 0,
     logger: logging.Logger | None = None,
-    raise_on_error: bool = False,
+    raise_on_error: bool = True,
 ) -> list[int] | None:
     """
     Reads a sequence of Modbus input registers asynchronously using the provided client.
@@ -403,7 +406,7 @@ async def modbus_read_input_registers(
             no logging is performed.
         raise_on_error (bool, optional):
             If True, raises `ModbusOperationError` on failure instead of returning None.
-            Defaults to False.
+            Defaults to True. Pass False to restore the legacy `None`-returning behavior.
 
     Returns:
         list[int] | None:
@@ -445,7 +448,7 @@ async def modbus_read_holding_registers(
     device_id: int = 1,
     max_count: int = 0,
     logger: logging.Logger | None = None,
-    raise_on_error: bool = False,
+    raise_on_error: bool = True,
 ) -> list[int] | None:
     """
     Reads a sequence of Modbus holding registers asynchronously using the provided client.
@@ -470,7 +473,7 @@ async def modbus_read_holding_registers(
             no logging is performed.
         raise_on_error (bool, optional):
             If True, raises `ModbusOperationError` on failure instead of returning None.
-            Defaults to False.
+            Defaults to True. Pass False to restore the legacy `None`-returning behavior.
 
     Returns:
         list[int] | None:
@@ -513,7 +516,7 @@ async def modbus_write_registers(
     max_count: int = 0,
     logger: logging.Logger | None = None,
     no_response_expected: bool = False,
-    raise_on_error: bool = False,
+    raise_on_error: bool = True,
 ) -> list[int] | None:
     """
     Writes a sequence of values to Modbus holding registers asynchronously using the provided
@@ -541,28 +544,26 @@ async def modbus_write_registers(
             If True, do not wait for the device_id response. Defaults to False.
         raise_on_error (bool, optional):
             If True, raises `ModbusOperationError` on failure instead of returning None.
-            Defaults to False.
+            Defaults to True. Pass False to restore the legacy `None`-returning behavior.
 
     Returns:
         list[int] | None:
             A list of written register values if the write operation is successful. Returns None if
-            an error occurs, the client fails to connect, or the response does not contain valid
-            register payload.
+            an error occurs, the client fails to connect, or `no_response_expected` is True.
 
     Raises:
         ModbusException:
             If an error occurs during the execution of the Modbus write operation.
         ModbusOperationError:
-            If `raise_on_error` is True and the write fails (raises a Modbus exception, receives
-            an error response, or returns no register echo). Not raised when
-            `no_response_expected` is True.
+            If `raise_on_error` is True and the write fails (raises a Modbus exception or receives
+            an error response). Not raised when `no_response_expected` is True.
 
     Notes:
         - The function ensures that the client connection is closed after execution, even if an
           error occurs.
         - Errors and exceptions are logged if a logger is provided.
-        - The function writes to holding registers and expects a response containing the written
-          values.
+        - A successful multi-register write (FC16) does not echo the written values in the response;
+          in that case the values passed to `value` are returned.
     """
     if logger:
         logger.debug(
@@ -603,6 +604,7 @@ async def modbus_write_registers(
                 raise ModbusOperationError(
                     f"{client.comm_params.comm_name}: Modbus exception on write register: {e}"
                 ) from e
+            return None
     finally:
         client.close()
     registers: list[int] = []
@@ -625,11 +627,9 @@ async def modbus_write_registers(
             registers += response.registers
     if registers:
         return registers
-    if raise_on_error and not no_response_expected:
-        raise ModbusOperationError(
-            f"{client.comm_params.comm_name}: No registers written"
-        )
-    return None
+    if no_response_expected:
+        return None
+    return value
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
@@ -640,7 +640,7 @@ async def modbus_write_register(
     device_id: int = 1,
     logger: logging.Logger | None = None,
     no_response_expected: bool = False,
-    raise_on_error: bool = False,
+    raise_on_error: bool = True,
 ) -> int | None:
     """
     Writes a value to Modbus holding register asynchronously using the provided
@@ -666,7 +666,7 @@ async def modbus_write_register(
             If True, do not wait for the device_id response. Defaults to False.
         raise_on_error (bool, optional):
             If True, raises `ModbusOperationError` on failure instead of returning None.
-            Defaults to False.
+            Defaults to True. Pass False to restore the legacy `None`-returning behavior.
 
     Returns:
         int | None:

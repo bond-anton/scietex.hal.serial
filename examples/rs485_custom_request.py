@@ -20,6 +20,7 @@ from scietex.hal.serial.config import ModbusSerialConnectionConfig as Config
 from scietex.hal.serial.server import RS485Server
 from scietex.hal.serial.client import RS485Client
 from scietex.hal.serial.utilities.checksum import lrc
+from scietex.hal.serial.utilities.exceptions import ModbusOperationError
 
 
 class CustomizedASCIIFramer(FramerAscii):
@@ -325,9 +326,13 @@ async def main(server_params: Config, client_params: Config):
     request = CustomizedRequest("T", data=some_data_int, dev_id=1, transaction_id=0)
 
     # Send the request to the server
-    response: ModbusPDU | None = await client.execute(
-        request, no_response_expected=False
-    )
+    try:
+        response: ModbusPDU | None = await client.execute(
+            request, no_response_expected=False
+        )
+    except ModbusOperationError as exc:
+        print(f"Request failed: {exc}")
+        response = None
     if response:
         print(f"Response: {response}")
         print(f"Response: {response.registers}")

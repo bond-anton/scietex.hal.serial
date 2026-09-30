@@ -2,8 +2,8 @@
 Module defining exceptions related to Modbus operations.
 
 This module defines custom exceptions that are raised when a Modbus read, write, or execute
-operation fails at runtime and the caller has opted into strict error handling via the
-``raise_on_error`` parameter.
+operation fails at runtime. Strict error handling is the default; pass ``raise_on_error=False``
+to opt out and return `None` on failure instead.
 
 Classes:
     - ModbusOperationError: Raised when a Modbus read, write, or execute operation fails.
@@ -11,8 +11,9 @@ Classes:
 Notes:
     - Subclasses `Exception` to represent a runtime protocol/transport failure rather than a
       configuration error.
-    - By default the read/write wrappers and `RS485Client` methods return `None` on failure; this
-      exception is raised only when `raise_on_error=True`.
+    - The read/write wrappers and `RS485Client` methods raise this exception on failure by default
+      (`raise_on_error=True`). Passing `raise_on_error=False` restores the legacy behavior of
+      returning `None` on failure.
 """
 
 

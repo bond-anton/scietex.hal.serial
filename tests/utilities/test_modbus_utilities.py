@@ -171,6 +171,7 @@ async def test_read_registers(
         count=100,
         device_id=1,
         logger=logger_fixture,
+        raise_on_error=False,
     )
     assert reg_data is None
 
@@ -195,6 +196,7 @@ async def test_read_registers(
         device_id=2,
         logger=logger_fixture,
         holding=False,
+        raise_on_error=False,
     )
     assert reg_data is None
 
@@ -237,6 +239,7 @@ async def test_write_registers(
         value=[7, 8, 9],
         device_id=1,
         logger=logger_fixture,
+        raise_on_error=False,
     )
     reg_data = await modbus_read_holding_registers(
         client,
@@ -253,6 +256,7 @@ async def test_write_registers(
         value=[100, 101],
         device_id=10,
         logger=logger_fixture,
+        raise_on_error=False,
     )
     assert reg_data is None
 
@@ -298,6 +302,7 @@ async def test_write_register(
         value=100,
         device_id=10,
         logger=logger_fixture,
+        raise_on_error=False,
     )
     assert reg_data is None
 

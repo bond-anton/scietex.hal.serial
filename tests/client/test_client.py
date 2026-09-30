@@ -1,6 +1,7 @@
 """Test modbus utils."""
 
 from logging import Logger
+from unittest.mock import AsyncMock, patch
 import pytest
 
 try:
@@ -45,7 +46,9 @@ async def test_read_registers(
     )
     value = await client.read_register(register=0, holding=True, signed=False)
     assert value == 1
-    value = await client.read_register(register=101, holding=True, signed=False)
+    value = await client.read_register(
+        register=101, holding=True, signed=False, raise_on_error=False
+    )
     assert value is None
     value = await client.read_register(register=0, holding=False, signed=True)
     assert value == 1
@@ -55,7 +58,7 @@ async def test_read_registers(
     assert isinstance(value, float)
     assert value == 0.01
     value = await client.read_register_float(
-        register=101, factor=100, holding=False, signed=True
+        register=101, factor=100, holding=False, signed=True, raise_on_error=False
     )
     assert value is None
     values = await client.read_registers(start_register=0, count=100, holding=False)
@@ -75,6 +78,7 @@ async def test_read_registers(
         holding=False,
         signed=False,
         byteorder=ByteOrder.LITTLE_ENDIAN,
+        raise_on_error=False,
     )
     assert value is None
     value = await client.read_two_registers_float(
@@ -104,6 +108,7 @@ async def test_read_registers(
         holding=False,
         signed=False,
         byteorder=ByteOrder.LITTLE_ENDIAN,
+        raise_on_error=False,
     )
     assert value is None
     with pytest.raises(ValueError):
@@ -137,20 +142,28 @@ async def test_write_registers(
     # value = await client.write_register_float(register=101, value=-1.07, signed=True)
     # assert value is None
     value = await client.write_two_registers(
-        start_register=0, value=1024365, byteorder=ByteOrder.LITTLE_ENDIAN, signed=False
+        start_register=0,
+        value=1024365,
+        byteorder=ByteOrder.LITTLE_ENDIAN,
+        signed=False,
+        raise_on_error=False,
     )
     assert value == 1024365
     value = await client.write_two_registers(
-        start_register=0, value=-1024365, byteorder=ByteOrder.BIG_ENDIAN, signed=True
+        start_register=0,
+        value=-1024365,
+        byteorder=ByteOrder.BIG_ENDIAN,
+        signed=True,
+        raise_on_error=False,
     )
     assert value == -1024365
 
     value = await client.write_two_registers_float(
-        start_register=0, value=0.07, signed=False
+        start_register=0, value=0.07, signed=False, raise_on_error=False
     )
     assert value == 0.07
     value = await client.write_two_registers_float(
-        start_register=0, value=-10000000.07, signed=True
+        start_register=0, value=-10000000.07, signed=True, raise_on_error=False
     )
     assert value == -10000000.07
     # Need to check what happens when writing outside the registers range
@@ -160,16 +173,71 @@ async def test_write_registers(
     # assert value is None
 
     values = [1, 2, 3]
-    resp = await client.write_registers(0, values, signed=False)
+    resp = await client.write_registers(0, values, signed=False, raise_on_error=False)
     assert values == resp
 
     values = [1, 2, -365]
-    resp = await client.write_registers(0, values, signed=True)
+    resp = await client.write_registers(0, values, signed=True, raise_on_error=False)
     assert values == resp
 
     resp = await client.read_registers(0, 3, signed=True)
     assert values == resp
 
+    await rs485_srv.stop()
+
+
+@pytest.mark.asyncio
+async def test_write_registers_default_path(
+    rs485_srv, client_config
+):  # pylint: disable=redefined-outer-name
+    """Default path: a multi-register write (FC16) returns the written values, no raise."""
+    await rs485_srv.start()
+    client = RS485Client(client_config)
+    result = await client.write_registers(0, [1, 2, 3])
+    assert result == [1, 2, 3]
+    await client.close()
+    await rs485_srv.stop()
+
+
+@pytest.mark.asyncio
+async def test_write_two_registers_default_path(
+    rs485_srv, client_config
+):  # pylint: disable=redefined-outer-name
+    """Default path: a two-register write returns the written value, no raise."""
+    await rs485_srv.start()
+    client = RS485Client(client_config)
+    result = await client.write_two_registers(0, 12345)
+    assert result == 12345
+    await client.close()
+    await rs485_srv.stop()
+
+
+@pytest.mark.asyncio
+async def test_write_register_zero_default_path(
+    rs485_srv, client_config
+):  # pylint: disable=redefined-outer-name
+    """Default path: writing a zero value returns 0 instead of a spurious error."""
+    await rs485_srv.start()
+    client = RS485Client(client_config)
+    with patch.object(client, "read_register", new=AsyncMock()) as mock_read:
+        result = await client.write_register(0, 0)
+    assert result == 0
+    mock_read.assert_not_awaited()
+    await client.close()
+    await rs485_srv.stop()
+
+
+@pytest.mark.asyncio
+async def test_read_register_float_zero_default_path(
+    rs485_srv, client_config
+):  # pylint: disable=redefined-outer-name
+    """Default path: a register holding 0 reads back as 0.0, not None."""
+    await rs485_srv.start()
+    client = RS485Client(client_config)
+    await client.write_register(0, 0)
+    result = await client.read_register_float(0)
+    assert result == 0.0
+    await client.close()
     await rs485_srv.stop()
 
 

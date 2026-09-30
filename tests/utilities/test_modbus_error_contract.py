@@ -1,4 +1,6 @@
-"""Tests for the opt-in Modbus error contract (``raise_on_error`` / ``ModbusOperationError``)."""
+"""Tests for the strict Modbus error contract (``raise_on_error`` / ``ModbusOperationError``)."""
+
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -41,11 +43,21 @@ def test_modbus_operation_error_importable() -> None:
 
 
 @pytest.mark.asyncio
-async def test_read_returns_none_on_failure_by_default() -> None:
-    """Default path is unchanged: a failed read returns None, not raises."""
+async def test_read_returns_none_on_failure_when_raise_on_error_false() -> None:
+    """``raise_on_error=False`` restores the legacy behavior: a failed read returns None."""
     client = modbus_get_client(_client_config())
-    result = await modbus_read_registers(client, start_register=0, count=1, device_id=1)
+    result = await modbus_read_registers(
+        client, start_register=0, count=1, device_id=1, raise_on_error=False
+    )
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_read_raises_on_error_by_default() -> None:
+    """A failed read raises ``ModbusOperationError`` by default (no ``raise_on_error`` arg)."""
+    client = modbus_get_client(_client_config())
+    with pytest.raises(ModbusOperationError):
+        await modbus_read_registers(client, start_register=0, count=1, device_id=1)
 
 
 @pytest.mark.asyncio
@@ -97,11 +109,35 @@ async def test_client_write_registers_raises_instead_of_fallback() -> None:
 
 
 @pytest.mark.asyncio
-async def test_client_write_registers_default_falls_back_to_none() -> None:
-    """Default ``RS485Client.write_registers`` keeps the write->read fallback (returns None)."""
+async def test_client_write_registers_raises_by_default() -> None:
+    """``RS485Client.write_registers`` raises on failure by default (no ``raise_on_error`` arg)."""
     client = RS485Client(_client_config())
-    result = await client.write_registers(0, [1, 2, 3])
+    with pytest.raises(ModbusOperationError):
+        await client.write_registers(0, [1, 2, 3])
+
+
+@pytest.mark.asyncio
+async def test_client_write_registers_returns_none_when_raise_on_error_false() -> None:
+    """``raise_on_error=False`` keeps the legacy write->read fallback (returns None)."""
+    client = RS485Client(_client_config())
+    result = await client.write_registers(0, [1, 2, 3], raise_on_error=False)
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_client_write_registers_fallback_reads_back_when_raise_on_error_false() -> (
+    None
+):
+    """``raise_on_error=False`` fires the write->read fallback and returns the read result."""
+    client = RS485Client(_client_config())
+    with patch.object(
+        client, "read_registers", new=AsyncMock(return_value=[1, 2, 3])
+    ) as mock_read:
+        result = await client.write_registers(0, [1, 2, 3], raise_on_error=False)
+    assert result == [1, 2, 3]
+    mock_read.assert_awaited_once_with(
+        0, count=3, holding=True, signed=False, raise_on_error=False
+    )
 
 
 @pytest.mark.asyncio
