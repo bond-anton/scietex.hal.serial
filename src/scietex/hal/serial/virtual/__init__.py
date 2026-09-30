@@ -32,7 +32,8 @@ This module streamlines the workflow for developers who need to simulate serial 
 without physical hardware, offering a versatile toolset for testing and prototyping.
 """
 
+from .exceptions import VirtualSerialNetworkError
 from .virtual_serial_network import VirtualSerialNetwork
 from .virtual_serial_pair import VirtualSerialPair
 
-__all__ = ["VirtualSerialNetwork", "VirtualSerialPair"]
+__all__ = ["VirtualSerialNetwork", "VirtualSerialPair", "VirtualSerialNetworkError"]

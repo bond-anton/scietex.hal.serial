@@ -40,6 +40,7 @@ from logging import Logger, getLogger
 from pathlib import Path
 
 from .worker import create_serial_network
+from .exceptions import VirtualSerialNetworkError
 from ..config import SerialConnectionMinimalConfig
 
 
@@ -182,7 +183,7 @@ class VirtualSerialNetwork:
         self.__p.start()
         self.virtual_ports_num = 0
         for _ in range(virtual_ports_num):
-            response = self.__master_io.recv()
+            response = self._recv()
             if response["status"] == "ERROR":
                 self.logger.error("VSN: ERROR (%s)", response["payload"]["error"])
             elif response["status"] == "OK":
@@ -191,7 +192,7 @@ class VirtualSerialNetwork:
                 self.virtual_ports_num += 1
         ports_connected = []
         for _ in range(len(self.external_ports)):
-            response = self.__master_io.recv()
+            response = self._recv()
             if response["status"] == "ERROR":
                 self.logger.error("VSN: ERROR (%s)", response["payload"]["error"])
             elif response["status"] == "OK":
@@ -201,6 +202,10 @@ class VirtualSerialNetwork:
         self._ext_ports_remove_duplicates()
         self.serial_ports += ports_connected
         self.serial_ports = list(set(self.serial_ports))
+        # The parent must not hold the worker's pipe end. Closing it here lets the
+        # parent's recv() see EOF if the worker later dies, instead of blocking forever.
+        self.__worker_io.close()
+        self.__worker_io = None
         self.logger.info("VSN: STARTED")
         self.logger.info("VSN: %s", self.serial_ports)
 
@@ -238,18 +243,88 @@ class VirtualSerialNetwork:
                     break
         self.external_ports = new_external_ports_list
 
+    def _ensure_worker_alive(self):
+        """
+        Raise if the worker process is not alive.
+
+        Called before sending commands so that a silently dead worker fails loudly
+        instead of blocking or raising a low-level pipe error.
+
+        Raises:
+            VirtualSerialNetworkError: If the worker process is None or no longer alive.
+        """
+        if self.__p is None or not self.__p.is_alive():
+            raise VirtualSerialNetworkError(
+                "VSN: Worker process is not running. The virtual serial network "
+                "cannot process commands."
+            )
+
+    def _recv(self) -> dict:
+        """
+        Receive a single response from the worker process.
+
+        Converts a closed pipe (worker death mid-command) into a domain-specific error so
+        callers fail loudly instead of blocking forever or leaking a low-level pipe error.
+
+        Returns:
+            dict: The response payload sent by the worker.
+
+        Raises:
+            VirtualSerialNetworkError: If the worker process died and the pipe was closed.
+        """
+        if self.__master_io is None:
+            raise VirtualSerialNetworkError(
+                "VSN: Worker process is not running. The virtual serial network "
+                "cannot process commands."
+            )
+        try:
+            return self.__master_io.recv()
+        except (EOFError, OSError) as e:
+            raise VirtualSerialNetworkError(
+                "VSN: Worker process died while processing a command."
+            ) from e
+
     def stop(self):
         """
         Stop the virtual serial network.
 
         Sends a stop signal to the worker process, waits for termination, and cleans up all
-            resources.
+            resources. Tolerates a worker that has already died.
         """
         if self.__p is not None:
             self.logger.debug("VSN: STOPPING")
-            if self.__master_io:
-                self.__master_io.send({"cmd": "stop"})
-            self.__p.join(timeout=5)  # Wait for the process to terminate
+            if self.__p.is_alive():
+                if self.__master_io:
+                    try:
+                        self.__master_io.send({"cmd": "stop"})
+                    # The worker may die between the liveness check and the send;
+                    # a broken pipe is not fatal to shutdown.
+                    except (BrokenPipeError, OSError):
+                        self.logger.warning(
+                            "VSN: Worker died before stop command was sent"
+                        )
+                self.__p.join(timeout=5)  # Wait for the process to terminate
+                if self.__p.is_alive():
+                    self.logger.warning(
+                        "VSN: Worker did not terminate in time; forcing termination"
+                    )
+                    self.__p.kill()
+                    self.__p.join(timeout=5)
+            if self.__p.is_alive():
+                # The worker blocks SIGTERM by design, so only SIGKILL can stop it.
+                # A live process here means it survived even that; close() would
+                # raise ValueError, so leave the handle untouched rather than drop
+                # a live, signal-immune process.
+                self.logger.error(
+                    "VSN: Worker survived SIGKILL; leaking process handle"
+                )
+            else:
+                try:
+                    self.__p.close()
+                # close() raises ValueError when the process is still running; this is
+                # defensive in case the process somehow survived SIGKILL.
+                except ValueError:
+                    pass
 
             self.__p = None
             self.__master_io, self.__worker_io = None, None
@@ -271,13 +346,14 @@ class VirtualSerialNetwork:
         """
         added_ports: list[str] = []
         if self.__master_io is not None:
+            self._ensure_worker_alive()
             ext_ports = [
                 con_params.to_dict() for con_params in list(set(external_ports))
             ]
             self.__master_io.send({"cmd": "add", "payload": ext_ports})
             ports_connected = []
             for _ in range(len(ext_ports)):
-                response = self.__master_io.recv()
+                response = self._recv()
                 if response["status"] == "ERROR":
                     self.logger.error("VSN: ERROR (%s)", response["payload"]["error"])
                 elif response["status"] == "EXIST":
@@ -312,9 +388,10 @@ class VirtualSerialNetwork:
         """
         new_ports: list[str] = []
         if self.__master_io is not None:
+            self._ensure_worker_alive()
             self.__master_io.send({"cmd": "create", "payload": ports_num})
             for _ in range(ports_num):
-                response = self.__master_io.recv()
+                response = self._recv()
                 if response["status"] == "ERROR":
                     self.logger.error("VSN: ERROR (%s)", response["payload"]["error"])
                 elif response["status"] == "OK":
@@ -338,10 +415,11 @@ class VirtualSerialNetwork:
         """
         removed_ports: list[str] = []
         if self.__master_io is not None:
+            self._ensure_worker_alive()
             self.__master_io.send({"cmd": "remove", "payload": remove_list})
 
             for _ in range(len(remove_list)):
-                response = self.__master_io.recv()
+                response = self._recv()
                 if response["status"] == "ERROR":
                     self.logger.error("VSN: ERROR (%s)", response["payload"]["error"])
                 if response["status"] == "NOT_EXIST":

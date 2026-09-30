@@ -514,32 +514,12 @@ def create_serial_network(
     slave_names: dict[str, int] = {}
     if external_ports is None:
         external_ports = []
-    with Selector() as selector, ExitStack() as stack:
-        generate_virtual_ports(
-            stack,
-            selector,
-            ports_number,
-            master_files,
-            master_cache,
-            slave_names,
-            worker_io,
-            openpty_func,
-            _logger,
-        )
-        add_external_ports(
-            stack,
-            selector,
-            external_ports,
-            master_files,
-            master_cache,
-            slave_names,
-            worker_io,
-            _logger,
-        )
-        while keep_running:
-            keep_running = process_cmd(
+    try:
+        with Selector() as selector, ExitStack() as stack:
+            generate_virtual_ports(
                 stack,
                 selector,
+                ports_number,
                 master_files,
                 master_cache,
                 slave_names,
@@ -547,13 +527,48 @@ def create_serial_network(
                 openpty_func,
                 _logger,
             )
-            forward_data(
+            add_external_ports(
+                stack,
                 selector,
+                external_ports,
                 master_files,
                 master_cache,
                 slave_names,
-                loopback,
-                logger=_logger,
-                data_logging_file=data_logging_file,
-                data_logging_splitter=data_logging_splitter,
+                worker_io,
+                _logger,
             )
+            while keep_running:
+                keep_running = process_cmd(
+                    stack,
+                    selector,
+                    master_files,
+                    master_cache,
+                    slave_names,
+                    worker_io,
+                    openpty_func,
+                    _logger,
+                )
+                forward_data(
+                    selector,
+                    master_files,
+                    master_cache,
+                    slave_names,
+                    loopback,
+                    logger=_logger,
+                    data_logging_file=data_logging_file,
+                    data_logging_splitter=data_logging_splitter,
+                )
+    # pylint: disable=broad-exception-caught
+    except Exception as e:
+        _logger.error("VSN: Worker: Unexpected error: %s", e)
+        try:
+            worker_io.send(
+                {
+                    "status": "ERROR",
+                    "payload": {"error": str(e), "traceback": traceback.format_exc()},
+                }
+            )
+        # The parent may have already closed the pipe; a failed send is not fatal.
+        except (BrokenPipeError, OSError):
+            pass
+        raise
