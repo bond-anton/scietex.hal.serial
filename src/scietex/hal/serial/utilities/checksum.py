@@ -106,11 +106,8 @@ def check_lrc(message: bytes) -> bool:
         - If the message is malformed (e.g., too short), the function returns False.
         - Assumes the last byte of the message is the LRC byte.
     """
-    try:
-        cs: int = message[-1]
-        payload: bytes = message[:-1]
-        if lrc(payload) == cs:
-            return True
-    except IndexError:
-        pass
-    return False
+    if not message:
+        return False
+    cs: int = message[-1]
+    payload: bytes = message[:-1]
+    return lrc(payload) == cs
