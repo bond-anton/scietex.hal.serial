@@ -52,18 +52,18 @@ Notes:
 # Exceptions
 from .exceptions import SerialConnectionConfigError
 
-# Abstract base classes
-from .serial_connection_interface import (
-    SerialConnectionMinimalConfigModel,
-    SerialConnectionConfigModel,
-    ModbusSerialConnectionConfigModel,
-)
-
 # Concrete implementations
 from .serial_connection_implementation import (
-    SerialConnectionMinimalConfig,
-    SerialConnectionConfig,
     ModbusSerialConnectionConfig,
+    SerialConnectionConfig,
+    SerialConnectionMinimalConfig,
+)
+
+# Abstract base classes
+from .serial_connection_interface import (
+    ModbusSerialConnectionConfigModel,
+    SerialConnectionConfigModel,
+    SerialConnectionMinimalConfigModel,
 )
 
 __all__ = [

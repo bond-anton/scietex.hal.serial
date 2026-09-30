@@ -2,29 +2,28 @@
 
 from logging import getLogger
 
+import pytest
 from pymodbus.datastore import ModbusDeviceContext
 
-import pytest
-
 try:
-    from src.scietex.hal.serial.virtual import (
-        VirtualSerialNetwork,
-        VirtualSerialPair,
-    )
     from src.scietex.hal.serial.config import (
         ModbusSerialConnectionConfig as Config,
     )
     from src.scietex.hal.serial.server.rs485_server import (
-        RS485Server,
         ReactiveSequentialDataBlock,
+        RS485Server,
+    )
+    from src.scietex.hal.serial.virtual import (
+        VirtualSerialNetwork,
+        VirtualSerialPair,
     )
 except ModuleNotFoundError:
-    from scietex.hal.serial.virtual import VirtualSerialPair
     from scietex.hal.serial.config import ModbusSerialConnectionConfig as Config
     from scietex.hal.serial.server.rs485_server import (
-        RS485Server,
         ReactiveSequentialDataBlock,
+        RS485Server,
     )
+    from scietex.hal.serial.virtual import VirtualSerialPair
 
 
 # pylint: disable=redefined-outer-name
@@ -95,7 +94,5 @@ def client_config(vsp_fixture):
 @pytest.fixture
 def rs485_srv(logger_fixture, server_config, single_slave_fixture):
     """RS485 Server."""
-    server = RS485Server(
-        server_config, devices=single_slave_fixture, logger=logger_fixture
-    )
+    server = RS485Server(server_config, devices=single_slave_fixture, logger=logger_fixture)
     return server

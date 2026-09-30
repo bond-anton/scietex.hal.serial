@@ -24,6 +24,7 @@ to react to changes in register values dynamically.
 """
 
 from logging import Logger, getLogger
+
 from pymodbus.datastore import ModbusSequentialDataBlock
 
 

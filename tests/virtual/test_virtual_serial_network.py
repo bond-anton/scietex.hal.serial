@@ -6,14 +6,14 @@ from logging import Logger
 import pytest
 
 try:
-    from src.scietex.hal.serial.utilities.mock import mock_openpty
     from src.scietex.hal.serial.config import SerialConnectionConfig
+    from src.scietex.hal.serial.utilities.mock import mock_openpty
     from src.scietex.hal.serial.virtual.virtual_serial_network import (
         VirtualSerialNetwork,
     )
 except ModuleNotFoundError:
-    from scietex.hal.serial.utilities.mock import mock_openpty
     from scietex.hal.serial.config import SerialConnectionConfig
+    from scietex.hal.serial.utilities.mock import mock_openpty
     from scietex.hal.serial.virtual.virtual_serial_network import (
         VirtualSerialNetwork,
     )
@@ -95,8 +95,7 @@ def test_vsn_add_external_ports(vsn_fixture, logger_fixture):
     assert vsn2.external_ports == []
 
     vsn2.add(
-        external_ports * 2
-        + [SerialConnectionConfig(port="/dev/not_existing_serial_port_001")]
+        external_ports * 2 + [SerialConnectionConfig(port="/dev/not_existing_serial_port_001")]
     )
     assert vsn2.external_ports == external_ports
 
@@ -127,8 +126,7 @@ def test_vsn_remove_ports(vsn_fixture, logger_fixture):
     assert vsn2.external_ports == []
 
     vsn2.add(
-        external_ports * 2
-        + [SerialConnectionConfig(port="/dev/not_existing_serial_port_001")]
+        external_ports * 2 + [SerialConnectionConfig(port="/dev/not_existing_serial_port_001")]
     )
     assert vsn2.external_ports == external_ports
     assert len(vsn2.serial_ports) == 4

@@ -3,24 +3,24 @@
 import logging
 
 import pytest
-
 from pymodbus import ModbusException
+from pymodbus.datastore import ModbusServerContext
 
 # from pymodbus.constants import ExcCodes
 from pymodbus.exceptions import ModbusIOException
-from pymodbus.pdu import ModbusPDU, DecodePDU, pdu as base
 from pymodbus.framer import FramerAscii
 from pymodbus.logging import Log
-from pymodbus.datastore import ModbusServerContext
+from pymodbus.pdu import DecodePDU, ModbusPDU
+from pymodbus.pdu import pdu as base
 
 try:
+    from src.scietex.hal.serial.client import RS485Client
     from src.scietex.hal.serial.config import ModbusSerialConnectionConfig as Config
     from src.scietex.hal.serial.server import RS485Server
-    from src.scietex.hal.serial.client import RS485Client
 except ModuleNotFoundError:
+    from scietex.hal.serial.client import RS485Client
     from scietex.hal.serial.config import ModbusSerialConnectionConfig as Config
     from scietex.hal.serial.server import RS485Server
-    from scietex.hal.serial.client import RS485Client
 
 
 Log.setLevel(logging.DEBUG)
@@ -93,9 +93,7 @@ class CustomDecodePDU(DecodePDU):
     def __init__(self, is_server: bool = False):
         super().__init__(is_server)
         self.pdu_table: dict[int, tuple[type[ModbusPDU], type[ModbusPDU]]] = {}
-        self.pdu_sub_table: dict[
-            int, dict[int, tuple[type[ModbusPDU], type[ModbusPDU]]]
-        ] = {}
+        self.pdu_sub_table: dict[int, dict[int, tuple[type[ModbusPDU], type[ModbusPDU]]]] = {}
 
     def lookupPduClass(self, data: bytes) -> type[base.ModbusPDU] | None:
         function_code = 0
@@ -109,11 +107,7 @@ class CustomDecodePDU(DecodePDU):
         # print(f"DECODER DECODING FRAME: {frame}, {frame.decode()}")
         try:
             function_code = 0
-            if not (
-                pdu_class := self.pdu_table.get(function_code, (None, None))[
-                    self.pdu_inx
-                ]
-            ):
+            if not (pdu_class := self.pdu_table.get(function_code, (None, None))[self.pdu_inx]):
                 Log.debug("decode PDU failed for function code {}", function_code)
                 raise ModbusException(f"Unknown response {function_code}")
             # print(f"DECODER PDU TYPE: {pdu_class}")
@@ -212,9 +206,7 @@ class CustomRequest(ModbusPDU):
         data_str = data.decode()
         self.data = data_str
 
-    async def datastore_update(
-        self, context: ModbusServerContext, device_id: int
-    ) -> ModbusPDU:
+    async def datastore_update(self, context: ModbusServerContext, device_id: int) -> ModbusPDU:
         """Execute."""
         _, _ = context, device_id
         response = CustomModbusResponse(

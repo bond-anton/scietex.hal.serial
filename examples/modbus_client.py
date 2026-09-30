@@ -1,11 +1,12 @@
 """Example of RS485Client class usage."""
 
 import asyncio
+
 from scietex.hal.serial import (
-    VirtualSerialPair,
-    RS485Server,
-    RS485Client,
     ModbusSerialConnectionConfig,
+    RS485Client,
+    RS485Server,
+    VirtualSerialPair,
 )
 
 

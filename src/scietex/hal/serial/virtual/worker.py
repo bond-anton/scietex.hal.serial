@@ -29,19 +29,21 @@ This module enables developers to simulate and test complex serial device intera
 relying on physical hardware, making it ideal for testing and debugging scenarios.
 """
 
-from typing import Callable, BinaryIO
-import os
-import signal
 import logging
+import os
+import pty
+import signal
+import traceback
+import tty
+from collections.abc import Callable
+from contextlib import ExitStack
 from logging import Logger, getLogger
 from logging.handlers import RotatingFileHandler
-import pty
-import tty
-from contextlib import ExitStack
 from multiprocessing.connection import Connection
-import traceback
 from selectors import EVENT_READ
 from selectors import DefaultSelector as Selector
+from typing import BinaryIO
+
 from serial import Serial  # type: ignore
 
 
@@ -97,9 +99,7 @@ def generate_virtual_ports(
             slave_names[slave_name] = master_fd
             stack.enter_context(master_files[master_fd])
             selector.register(master_fd, EVENT_READ)
-            _logger.debug(
-                "VSN: Worker: Successfully generated virtual port '%s'", slave_name
-            )
+            _logger.debug("VSN: Worker: Successfully generated virtual port '%s'", slave_name)
             worker_io.send({"status": "OK", "payload": slave_name})
         # pylint: disable=broad-exception-caught
         except Exception as e:
@@ -149,13 +149,9 @@ def add_external_ports(
     """
     _logger: Logger = logger if isinstance(logger, Logger) else getLogger()
     for con_params in external_ports:
-        _logger.debug(
-            "VSN: Worker: Attempting to add external port '%s'", con_params["port"]
-        )
+        _logger.debug("VSN: Worker: Attempting to add external port '%s'", con_params["port"])
         if con_params["port"] in slave_names:
-            _logger.debug(
-                "VSN: Worker: External port '%s' already exists", con_params["port"]
-            )
+            _logger.debug("VSN: Worker: External port '%s' already exists", con_params["port"])
             worker_io.send({"status": "EXIST", "payload": con_params["port"]})
         else:
             try:
@@ -231,15 +227,11 @@ def remove_ports(
                 master_cache.pop(master_fd, None)
                 del master_files[master_fd]
                 del slave_names[slave_name]
-                _logger.debug(
-                    "VSN: Worker: Successfully removed slave name '%s'", slave_name
-                )
+                _logger.debug("VSN: Worker: Successfully removed slave name '%s'", slave_name)
                 worker_io.send({"status": "OK", "payload": slave_name})
             # pylint: disable=broad-exception-caught
             except Exception as e:
-                _logger.warning(
-                    "VSN: Worker: Failed to remove slave name '%s': %s", slave_name, e
-                )
+                _logger.warning("VSN: Worker: Failed to remove slave name '%s': %s", slave_name, e)
                 worker_io.send(
                     {
                         "status": "ERROR",

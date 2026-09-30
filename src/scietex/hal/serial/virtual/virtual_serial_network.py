@@ -30,18 +30,16 @@ This class encapsulates the complexity of managing multiple serial ports, allowi
 on higher-level tasks such as simulating device behavior or integrating external hardware.
 """
 
-from typing import Callable
 import signal
+from collections.abc import Callable
+from logging import Logger, getLogger
 from multiprocessing import Pipe, Process
 from multiprocessing.connection import Connection
-
-from logging import Logger, getLogger
-
 from pathlib import Path
 
-from .worker import create_serial_network
-from .exceptions import VirtualSerialNetworkError
 from ..config import SerialConnectionMinimalConfig
+from .exceptions import VirtualSerialNetworkError
+from .worker import create_serial_network
 
 
 # pylint: disable=too-many-instance-attributes
@@ -126,9 +124,7 @@ class VirtualSerialNetwork:
             try:
                 Path(self.data_log_dir).mkdir(parents=True, exist_ok=True)
                 self.data_logging_file = str(Path(self.data_log_dir) / "vsn-data.log")
-                self.logger.info(
-                    "VSN: Data logging enabled. Log file: %s", self.data_logging_file
-                )
+                self.logger.info("VSN: Data logging enabled. Log file: %s", self.data_logging_file)
             except Exception as e:  # pylint: disable=broad-exception-caught
                 self.logger.error(
                     "VSN: Failed to create data log directory: %s. Data logging disabled.",
@@ -163,9 +159,7 @@ class VirtualSerialNetwork:
         self.__master_io, self.__worker_io = Pipe()
         external_ports = None
         if self.external_ports:
-            external_ports = [
-                con_params.to_dict() for con_params in self.external_ports
-            ]
+            external_ports = [con_params.to_dict() for con_params in self.external_ports]
         virtual_ports_num = self.virtual_ports_num
         self.__p = Process(
             target=create_serial_network,
@@ -300,9 +294,7 @@ class VirtualSerialNetwork:
                     # The worker may die between the liveness check and the send;
                     # a broken pipe is not fatal to shutdown.
                     except (BrokenPipeError, OSError):
-                        self.logger.warning(
-                            "VSN: Worker died before stop command was sent"
-                        )
+                        self.logger.warning("VSN: Worker died before stop command was sent")
                 self.__p.join(timeout=5)  # Wait for the process to terminate
                 if self.__p.is_alive():
                     self.logger.warning(
@@ -315,9 +307,7 @@ class VirtualSerialNetwork:
                 # A live process here means it survived even that; close() would
                 # raise ValueError, so leave the handle untouched rather than drop
                 # a live, signal-immune process.
-                self.logger.error(
-                    "VSN: Worker survived SIGKILL; leaking process handle"
-                )
+                self.logger.error("VSN: Worker survived SIGKILL; leaking process handle")
             else:
                 try:
                     self.__p.close()
@@ -347,9 +337,7 @@ class VirtualSerialNetwork:
         added_ports: list[str] = []
         if self.__master_io is not None:
             self._ensure_worker_alive()
-            ext_ports = [
-                con_params.to_dict() for con_params in list(set(external_ports))
-            ]
+            ext_ports = [con_params.to_dict() for con_params in list(set(external_ports))]
             self.__master_io.send({"cmd": "add", "payload": ext_ports})
             ports_connected = []
             for _ in range(len(ext_ports)):
@@ -357,9 +345,7 @@ class VirtualSerialNetwork:
                 if response["status"] == "ERROR":
                     self.logger.error("VSN: ERROR (%s)", response["payload"]["error"])
                 elif response["status"] == "EXIST":
-                    self.logger.error(
-                        "VSN: Port (%s) already added.", response["payload"]
-                    )
+                    self.logger.error("VSN: Port (%s) already added.", response["payload"])
                 elif response["status"] == "OK":
                     for port in list(set(external_ports)):
                         if port.port == response["payload"]:

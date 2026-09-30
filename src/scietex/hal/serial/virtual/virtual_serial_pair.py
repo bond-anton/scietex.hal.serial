@@ -17,11 +17,11 @@ The `VirtualSerialPair` class simplifies the setup of a virtual serial environme
 easier to simulate and test serial communication without requiring physical hardware.
 """
 
-from typing import Callable
+from collections.abc import Callable
 from logging import Logger
 
-from .virtual_serial_network import VirtualSerialNetwork
 from ..config import SerialConnectionMinimalConfig
+from .virtual_serial_network import VirtualSerialNetwork
 
 
 class VirtualSerialPair(VirtualSerialNetwork):
@@ -59,9 +59,7 @@ class VirtualSerialPair(VirtualSerialNetwork):
             logger (Logger | None, optional): A logging handler for recording operational
                 information. Defaults to a basic logger if none is provided.
         """
-        super().__init__(
-            virtual_ports_num=2, external_ports=None, loopback=False, logger=logger
-        )
+        super().__init__(virtual_ports_num=2, external_ports=None, loopback=False, logger=logger)
 
     def start(self, openpty_func: Callable | None = None):
         """
@@ -93,9 +91,7 @@ class VirtualSerialPair(VirtualSerialNetwork):
         Args:
             external_ports (list[SerialConnectionMinimalConfig]): Ignored in this context.
         """
-        self.logger.info(
-            "VSP: Adding external ports is not supported for Virtual Serial Pairs."
-        )
+        self.logger.info("VSP: Adding external ports is not supported for Virtual Serial Pairs.")
 
     def create(self, ports_num: int):
         """
@@ -119,6 +115,4 @@ class VirtualSerialPair(VirtualSerialNetwork):
         Args:
             remove_list (list[str]): Ignored in this context.
         """
-        self.logger.info(
-            "VSP: Removing ports is not supported for Virtual Serial Pairs."
-        )
+        self.logger.info("VSP: Removing ports is not supported for Virtual Serial Pairs.")

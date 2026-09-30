@@ -54,18 +54,18 @@ Methods:
 """
 
 from .serial_connection_interface import (
-    SerialConnectionMinimalConfigModel,
-    SerialConnectionConfigModel,
     ModbusSerialConnectionConfigModel,
+    SerialConnectionConfigModel,
+    SerialConnectionMinimalConfigModel,
 )
 from .validation import (
-    validate_port,
     validate_baudrate,
     validate_bytesize,
+    validate_framer,
     validate_parity,
+    validate_port,
     validate_stopbits,
     validate_timeout,
-    validate_framer,
 )
 
 
@@ -233,9 +233,7 @@ class SerialConnectionMinimalConfig(SerialConnectionMinimalConfigModel):
         )
 
 
-class SerialConnectionConfig(
-    SerialConnectionMinimalConfig, SerialConnectionConfigModel
-):
+class SerialConnectionConfig(SerialConnectionMinimalConfig, SerialConnectionConfigModel):
     """
     Serial connection config.
 

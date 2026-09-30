@@ -322,9 +322,7 @@ def float_from_unsigned32(n: int, factor: int | float = 100) -> float:
     return to_signed32(n) / factor
 
 
-def split_32bit(
-    n: int, byteorder: ByteOrder = ByteOrder.LITTLE_ENDIAN
-) -> tuple[int, int]:
+def split_32bit(n: int, byteorder: ByteOrder = ByteOrder.LITTLE_ENDIAN) -> tuple[int, int]:
     """
     Split 32-bit integer between two 16-bit values.
 
@@ -355,9 +353,7 @@ def split_32bit(
     raise ValueError("Invalid byteorder value")
 
 
-def combine_32bit(
-    a: int, b: int, byteorder: ByteOrder = ByteOrder.LITTLE_ENDIAN
-) -> int:
+def combine_32bit(a: int, b: int, byteorder: ByteOrder = ByteOrder.LITTLE_ENDIAN) -> int:
     """
     Combine 32-bit integer from two 16-bit values.
 

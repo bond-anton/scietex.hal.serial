@@ -2,6 +2,7 @@
 
 from logging import Logger
 from unittest.mock import AsyncMock, patch
+
 import pytest
 
 try:
@@ -22,9 +23,7 @@ async def test_client_init(client_config, logger_fixture) -> None:
     """
     Test RS485Client constructor function.
     """
-    client = RS485Client(
-        client_config, address=2, label="MY DEV", logger=logger_fixture
-    )
+    client = RS485Client(client_config, address=2, label="MY DEV", logger=logger_fixture)
     assert client.address == 2
     assert client.label == "MY DEV"
     assert client.logger == logger_fixture
@@ -36,14 +35,10 @@ async def test_client_init(client_config, logger_fixture) -> None:
 
 
 @pytest.mark.asyncio
-async def test_read_registers(
-    rs485_srv, client_config, logger_fixture
-):  # pylint: disable=redefined-outer-name
+async def test_read_registers(rs485_srv, client_config, logger_fixture):  # pylint: disable=redefined-outer-name
     """Test reading registers."""
     await rs485_srv.start()
-    client = RS485Client(
-        client_config, address=1, label="MY DEV", logger=logger_fixture
-    )
+    client = RS485Client(client_config, address=1, label="MY DEV", logger=logger_fixture)
     value = await client.read_register(register=0, holding=True, signed=False)
     assert value == 1
     value = await client.read_register(
@@ -52,9 +47,7 @@ async def test_read_registers(
     assert value is None
     value = await client.read_register(register=0, holding=False, signed=True)
     assert value == 1
-    value = await client.read_register_float(
-        register=0, factor=100, holding=False, signed=True
-    )
+    value = await client.read_register_float(register=0, factor=100, holding=False, signed=True)
     assert isinstance(value, float)
     assert value == 0.01
     value = await client.read_register_float(
@@ -98,10 +91,7 @@ async def test_read_registers(
         byteorder=ByteOrder.BIG_ENDIAN,
     )
     assert isinstance(value, float)
-    assert (
-        value
-        == float(to_signed32(combine_32bit(1, 2, byteorder=ByteOrder.BIG_ENDIAN))) / 100
-    )
+    assert value == float(to_signed32(combine_32bit(1, 2, byteorder=ByteOrder.BIG_ENDIAN))) / 100
     value = await client.read_two_registers_float(
         start_register=101,
         factor=100,
@@ -124,9 +114,7 @@ async def test_read_registers(
 
 
 @pytest.mark.asyncio
-async def test_write_registers(
-    rs485_srv, client_config, logger_fixture
-):  # pylint: disable=redefined-outer-name
+async def test_write_registers(rs485_srv, client_config, logger_fixture):  # pylint: disable=redefined-outer-name
     """Test writing registers."""
     await rs485_srv.start()
     client = RS485Client(client_config, logger=logger_fixture)
@@ -187,9 +175,7 @@ async def test_write_registers(
 
 
 @pytest.mark.asyncio
-async def test_write_registers_default_path(
-    rs485_srv, client_config
-):  # pylint: disable=redefined-outer-name
+async def test_write_registers_default_path(rs485_srv, client_config):  # pylint: disable=redefined-outer-name
     """Default path: a multi-register write (FC16) returns the written values, no raise."""
     await rs485_srv.start()
     client = RS485Client(client_config)
@@ -200,9 +186,7 @@ async def test_write_registers_default_path(
 
 
 @pytest.mark.asyncio
-async def test_write_two_registers_default_path(
-    rs485_srv, client_config
-):  # pylint: disable=redefined-outer-name
+async def test_write_two_registers_default_path(rs485_srv, client_config):  # pylint: disable=redefined-outer-name
     """Default path: a two-register write returns the written value, no raise."""
     await rs485_srv.start()
     client = RS485Client(client_config)
@@ -213,9 +197,7 @@ async def test_write_two_registers_default_path(
 
 
 @pytest.mark.asyncio
-async def test_write_register_zero_default_path(
-    rs485_srv, client_config
-):  # pylint: disable=redefined-outer-name
+async def test_write_register_zero_default_path(rs485_srv, client_config):  # pylint: disable=redefined-outer-name
     """Default path: writing a zero value returns 0 instead of a spurious error."""
     await rs485_srv.start()
     client = RS485Client(client_config)
@@ -228,9 +210,7 @@ async def test_write_register_zero_default_path(
 
 
 @pytest.mark.asyncio
-async def test_read_register_float_zero_default_path(
-    rs485_srv, client_config
-):  # pylint: disable=redefined-outer-name
+async def test_read_register_float_zero_default_path(rs485_srv, client_config):  # pylint: disable=redefined-outer-name
     """Default path: a register holding 0 reads back as 0.0, not None."""
     await rs485_srv.start()
     client = RS485Client(client_config)

@@ -7,20 +7,21 @@ This example is just to show how one can implement custom protocol using
 
 import asyncio
 
-from pymodbus.constants import ExcCodes
 from pymodbus import ModbusException
+from pymodbus.constants import ExcCodes
+from pymodbus.datastore import ModbusServerContext
 from pymodbus.exceptions import ModbusIOException
-from pymodbus.pdu import ModbusPDU, DecodePDU, pdu as base
 from pymodbus.framer import FramerAscii
 from pymodbus.logging import Log
-from pymodbus.datastore import ModbusServerContext
+from pymodbus.pdu import DecodePDU, ModbusPDU
+from pymodbus.pdu import pdu as base
 
-from scietex.hal.serial.virtual import VirtualSerialPair
+from scietex.hal.serial.client import RS485Client
 from scietex.hal.serial.config import ModbusSerialConnectionConfig as Config
 from scietex.hal.serial.server import RS485Server
-from scietex.hal.serial.client import RS485Client
 from scietex.hal.serial.utilities.checksum import lrc
 from scietex.hal.serial.utilities.exceptions import ModbusOperationError
+from scietex.hal.serial.virtual import VirtualSerialPair
 
 
 class CustomizedASCIIFramer(FramerAscii):
@@ -63,9 +64,7 @@ class CustomizedASCIIFramer(FramerAscii):
                 print(f"MSG: {msg}")
                 try:
                     lrc_in = ord(
-                        data_buffer[data_end - lrc_len : data_end].decode(
-                            encoding="utf-8"
-                        )
+                        data_buffer[data_end - lrc_len : data_end].decode(encoding="utf-8")
                     )
                 except UnicodeDecodeError:
                     lrc_len += 1
@@ -80,9 +79,7 @@ class CustomizedASCIIFramer(FramerAscii):
 
             len_used += data_end + 2
             msg = data_buffer[0 : data_end - lrc_len]
-            lrc_in = ord(
-                data_buffer[data_end - lrc_len : data_end].decode(encoding="utf-8")
-            )
+            lrc_in = ord(data_buffer[data_end - lrc_len : data_end].decode(encoding="utf-8"))
             print("FRAMER DECODE RAW:", data_buffer, dev_id, len_used, msg, msg[3:])
             if not self.check_LRC(msg, lrc_in):
                 print(f"WRONG CS FOR MSG: {msg}, LRC_IN: {lrc_in}")
@@ -119,9 +116,7 @@ class CustomizedASCIIFramer(FramerAscii):
             print("NO DATA")
             return 0, None
         used_len, dev_id, tid, frame_data = self.decode(data)
-        print(
-            f"=== LEN: {used_len}, DEV_ID: {dev_id}, TR_ID: {tid}, FRAME_DATA: {frame_data}"
-        )
+        print(f"=== LEN: {used_len}, DEV_ID: {dev_id}, TR_ID: {tid}, FRAME_DATA: {frame_data}")
         print(self.decoder)
         if (res := self.decoder.decode(frame_data)) is None:
             raise ModbusIOException("Unable to decode request")
@@ -137,9 +132,7 @@ class CustomizedDecodePDU(DecodePDU):
     def __init__(self, is_server: bool = False):
         super().__init__(is_server)
         self.pdu_table: dict[int, tuple[type[ModbusPDU], type[ModbusPDU]]] = {}
-        self.pdu_sub_table: dict[
-            int, dict[int, tuple[type[ModbusPDU], type[ModbusPDU]]]
-        ] = {}
+        self.pdu_sub_table: dict[int, dict[int, tuple[type[ModbusPDU], type[ModbusPDU]]]] = {}
 
     def lookupPduClass(self, data: bytes) -> type[base.ModbusPDU] | None:
         function_code = 0
@@ -153,11 +146,7 @@ class CustomizedDecodePDU(DecodePDU):
         print(f"DECODER DECODING FRAME: {frame}, {frame.decode()}")
         try:
             function_code = 0
-            if not (
-                pdu_class := self.pdu_table.get(function_code, (None, None))[
-                    self.pdu_inx
-                ]
-            ):
+            if not (pdu_class := self.pdu_table.get(function_code, (None, None))[self.pdu_inx]):
                 Log.debug("decode PDU failed for function code {}", function_code)
                 raise ModbusException(f"Unknown response {function_code}")
             print(f"DECODER PDU TYPE: {pdu_class}")
@@ -173,9 +162,7 @@ class CustomizedDecodePDU(DecodePDU):
                 pdu.sub_function_code,
                 str(pdu),
             )
-            print(
-                f"decoded PDU function_code({pdu_class.function_code}) -> {str(pdu_class)} "
-            )
+            print(f"decoded PDU function_code({pdu_class.function_code}) -> {str(pdu_class)} ")
             pdu.registers = list(frame)[1:]
             return pdu
         except (ModbusException, ValueError, IndexError) as exc:
@@ -271,9 +258,7 @@ class CustomizedRequest(ModbusPDU):
         # self.command = data_str[0]
         self.data = data_str
 
-    async def datastore_update(
-        self, context: ModbusServerContext, device_id: int
-    ) -> ModbusPDU:
+    async def datastore_update(self, context: ModbusServerContext, device_id: int) -> ModbusPDU:
         """Execute."""
         response = CustomizedModbusResponse(
             self.command,
@@ -327,9 +312,7 @@ async def main(server_params: Config, client_params: Config):
 
     # Send the request to the server
     try:
-        response: ModbusPDU | None = await client.execute(
-            request, no_response_expected=False
-        )
+        response: ModbusPDU | None = await client.execute(request, no_response_expected=False)
     except ModbusOperationError as exc:
         print(f"Request failed: {exc}")
         response = None

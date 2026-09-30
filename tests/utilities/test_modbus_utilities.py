@@ -1,16 +1,15 @@
 """Test modbus utils."""
 
+import pytest
+from pymodbus.client import AsyncModbusSerialClient
 from pymodbus.framer import FramerRTU
 from pymodbus.pdu import DecodePDU, ModbusPDU
-from pymodbus.client import AsyncModbusSerialClient
-
-import pytest
 
 try:
     from src.scietex.hal.serial.config import (
-        SerialConnectionMinimalConfig,
-        SerialConnectionConfig,
         ModbusSerialConnectionConfig,
+        SerialConnectionConfig,
+        SerialConnectionMinimalConfig,
     )
     from src.scietex.hal.serial.config.defaults import (
         DEFAULT_BAUDRATE,
@@ -23,17 +22,17 @@ try:
         FramerType,
         modbus_connection_config,
         modbus_get_client,
-        modbus_read_registers,
-        modbus_read_input_registers,
         modbus_read_holding_registers,
-        modbus_write_registers,
+        modbus_read_input_registers,
+        modbus_read_registers,
         modbus_write_register,
+        modbus_write_registers,
     )
 except ModuleNotFoundError:
     from scietex.hal.serial.config import (
-        SerialConnectionMinimalConfig,
-        SerialConnectionConfig,
         ModbusSerialConnectionConfig,
+        SerialConnectionConfig,
+        SerialConnectionMinimalConfig,
     )
     from scietex.hal.serial.config.defaults import (
         DEFAULT_BAUDRATE,
@@ -46,11 +45,11 @@ except ModuleNotFoundError:
         FramerType,
         modbus_connection_config,
         modbus_get_client,
-        modbus_read_registers,
-        modbus_read_input_registers,
         modbus_read_holding_registers,
-        modbus_write_registers,
+        modbus_read_input_registers,
+        modbus_read_registers,
         modbus_write_register,
+        modbus_write_registers,
     )
 
 
@@ -105,9 +104,7 @@ async def test_get_client(client_config):  # pylint: disable=redefined-outer-nam
 
 
 @pytest.mark.asyncio
-async def test_read_registers(
-    rs485_srv, client_config, logger_fixture, store_fixture, vsp_fixture
-):  # pylint: disable=redefined-outer-name
+async def test_read_registers(rs485_srv, client_config, logger_fixture, store_fixture, vsp_fixture):  # pylint: disable=redefined-outer-name
     """Test reading registers."""
     await rs485_srv.start()
     await rs485_srv.update_slave(2, store_fixture)
@@ -217,9 +214,7 @@ async def test_read_registers(
 
 
 @pytest.mark.asyncio
-async def test_write_registers(
-    rs485_srv, client_config, logger_fixture
-):  # pylint: disable=redefined-outer-name
+async def test_write_registers(rs485_srv, client_config, logger_fixture):  # pylint: disable=redefined-outer-name
     """Test writing registers."""
     await rs485_srv.start()
     client = modbus_get_client(client_config)
@@ -264,9 +259,7 @@ async def test_write_registers(
 
 
 @pytest.mark.asyncio
-async def test_write_register(
-    rs485_srv, client_config, logger_fixture
-):  # pylint: disable=redefined-outer-name
+async def test_write_register(rs485_srv, client_config, logger_fixture):  # pylint: disable=redefined-outer-name
     """Test writing single register."""
     await rs485_srv.start()
     client = modbus_get_client(client_config)

@@ -29,21 +29,21 @@ from copy import deepcopy
 from logging import Logger, getLogger
 
 from pymodbus.datastore import (
-    ModbusServerContext,
     ModbusDeviceContext,
+    ModbusServerContext,
     ModbusSimulatorContext,
 )
-from pymodbus.pdu import ModbusPDU, DecodePDU
 from pymodbus.framer import FramerBase
+from pymodbus.pdu import DecodePDU, ModbusPDU
 from pymodbus.pdu.device import ModbusDeviceIdentification
 from pymodbus.server import ModbusSerialServer
 
-from ..version import __version__ as version
 from ..config import (
-    SerialConnectionConfigModel,
     ModbusSerialConnectionConfigModel,
+    SerialConnectionConfigModel,
 )
 from ..utilities.modbus import modbus_connection_config
+from ..version import __version__ as version
 from .modbus_datablock import ReactiveSequentialDataBlock
 
 SERVER_INFO = {
@@ -134,9 +134,9 @@ class RS485Server:
 
         self.context = self._create_context()
         self.identity = ModbusDeviceIdentification(info_name=SERVER_INFO)
-        self.con_params: (
-            SerialConnectionConfigModel | ModbusSerialConnectionConfigModel
-        ) = con_params
+        self.con_params: SerialConnectionConfigModel | ModbusSerialConnectionConfigModel = (
+            con_params
+        )
         self.logger: Logger = logger if isinstance(logger, Logger) else getLogger()
         self._task: asyncio.Task | None = None
         self.server: ModbusSerialServer | None = None
@@ -154,8 +154,7 @@ class RS485Server:
         context_devices: dict[int, ModbusDeviceContext | ModbusSimulatorContext]
         if self.devices:
             context_devices = {
-                device_address: deepcopy(store)
-                for device_address, store in self.devices.items()
+                device_address: deepcopy(store) for device_address, store in self.devices.items()
             }
         else:
             context_devices = {0: ModbusDeviceContext()}
@@ -207,9 +206,7 @@ class RS485Server:
             - The server context is updated dynamically, allowing immediate changes to take effect.
         """
         if not isinstance(slave_id, int) or not 0 < slave_id < 248:
-            raise ValueError(
-                "Invalid device_id ID. Must be an integer between 1 and 247."
-            )
+            raise ValueError("Invalid device_id ID. Must be an integer between 1 and 247.")
         self.devices[slave_id] = store
         self.context = self._create_context()
         self.logger.info("Slave with ID %s added/updated successfully.", slave_id)

@@ -3,21 +3,21 @@
 import pytest
 
 try:
+    from src.scietex.hal.serial.config.defaults import DEFAULT_TIMEOUT
     from src.scietex.hal.serial.config.exceptions import (
         SerialConnectionConfigError,
     )
     from src.scietex.hal.serial.config.serial_connection_implementation import (
         SerialConnectionConfig as Config,
     )
-    from src.scietex.hal.serial.config.defaults import DEFAULT_TIMEOUT
 except ModuleNotFoundError:
+    from scietex.hal.serial.config.defaults import DEFAULT_TIMEOUT
     from scietex.hal.serial.config.exceptions import (
         SerialConnectionConfigError,
     )
     from scietex.hal.serial.config.serial_connection_implementation import (
         SerialConnectionConfig as Config,
     )
-    from scietex.hal.serial.config.defaults import DEFAULT_TIMEOUT
 
 
 def test_constructor_timeout() -> None:
