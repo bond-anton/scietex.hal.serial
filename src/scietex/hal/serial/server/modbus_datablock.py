@@ -73,7 +73,9 @@ class ReactiveSequentialDataBlock(ModbusSequentialDataBlock):
         Notes:
             - Invokes the `on_change` callback after modifying the register values.
         """
-        super().setValues(address, values)
+        # pymodbus >= 3.15 reduced ModbusSequentialDataBlock to a deprecated shim with no
+        # setValues; this override is dead code until the block is ported to the SimData API.
+        super().setValues(address, values)  # ty: ignore[unresolved-attribute]
         self.on_change(address, values)
 
     def on_change(self, address, values):

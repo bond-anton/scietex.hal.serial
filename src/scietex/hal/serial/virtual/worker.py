@@ -44,7 +44,7 @@ from selectors import EVENT_READ
 from selectors import DefaultSelector as Selector
 from typing import BinaryIO
 
-from serial import Serial  # type: ignore
+from serial import Serial
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments

@@ -184,7 +184,9 @@ class RS485Server:
                     for pdu in self.custom_pdu:
                         self.server.decoder.register(pdu)
             if self.custom_framer:
-                self.server.framer = self.custom_framer
+                # pymodbus types `framer` as a narrow concrete union; custom_framer is a
+                # FramerBase subclass, which is compatible at runtime.
+                self.server.framer = self.custom_framer  # ty: ignore[invalid-assignment]
             self._task = asyncio.create_task(self.server.serve_forever())
             self.logger.info("Server started")
 
