@@ -25,11 +25,13 @@ over RS485 interfaces.
 """
 
 import asyncio
+from copy import deepcopy
 from logging import Logger, getLogger
 
 from pymodbus.datastore import (
     ModbusServerContext,
     ModbusDeviceContext,
+    ModbusSimulatorContext,
 )
 from pymodbus.pdu import ModbusPDU, DecodePDU
 from pymodbus.framer import FramerBase
@@ -130,7 +132,7 @@ class RS485Server:
             store = ModbusDeviceContext(di=block, co=block, hr=block, ir=block)
             self.devices = {device_address: store}
 
-        self.context = ModbusServerContext(devices=self.devices, single=False)
+        self.context = self._create_context()
         self.identity = ModbusDeviceIdentification(info_name=SERVER_INFO)
         self.con_params: (
             SerialConnectionConfigModel | ModbusSerialConnectionConfigModel
@@ -138,6 +140,26 @@ class RS485Server:
         self.logger: Logger = logger if isinstance(logger, Logger) else getLogger()
         self._task: asyncio.Task | None = None
         self.server: ModbusSerialServer | None = None
+
+    def _create_context(self) -> ModbusServerContext:
+        """
+        Build a ModbusServerContext from the registered devices.
+
+        pymodbus >= 3.15 rejects an empty ``devices`` mapping and reuses a single
+        ``SimDevice`` per ``ModbusDeviceContext``, so each device id must be backed
+        by its own context instance. The context is therefore built from per-device
+        copies of ``self.devices``; a placeholder device (address 0) keeps the context
+        valid while ``self.devices`` is empty.
+        """
+        context_devices: dict[int, ModbusDeviceContext | ModbusSimulatorContext]
+        if self.devices:
+            context_devices = {
+                device_address: deepcopy(store)
+                for device_address, store in self.devices.items()
+            }
+        else:
+            context_devices = {0: ModbusDeviceContext()}
+        return ModbusServerContext(devices=context_devices, single=False)
 
     async def start(self):
         """
@@ -189,7 +211,7 @@ class RS485Server:
                 "Invalid device_id ID. Must be an integer between 1 and 247."
             )
         self.devices[slave_id] = store
-        self.context = ModbusServerContext(devices=self.devices, single=False)
+        self.context = self._create_context()
         self.logger.info("Slave with ID %s added/updated successfully.", slave_id)
         if self._task is not None:
             await self.restart()
@@ -213,7 +235,7 @@ class RS485Server:
         """
         if slave_id in self.devices:
             del self.devices[slave_id]
-            self.context = ModbusServerContext(devices=self.devices, single=False)
+            self.context = self._create_context()
             self.logger.info("Slave with ID %s deleted successfully.", slave_id)
             if self._task is not None:
                 await self.restart()
