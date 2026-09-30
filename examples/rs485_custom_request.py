@@ -3,8 +3,6 @@ This example is just to show how one can implement custom protocol using
 `scietex.hal.serial` Server and Client abstractions and pymodbus PDU and Framer concepts.
 """
 
-# pylint: disable=duplicate-code
-
 import asyncio
 
 from pymodbus import ModbusException

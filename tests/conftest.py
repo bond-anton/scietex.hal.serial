@@ -26,9 +26,6 @@ except ModuleNotFoundError:
     from scietex.hal.serial.virtual import VirtualSerialPair
 
 
-# pylint: disable=redefined-outer-name
-
-
 @pytest.fixture
 def logger_fixture():
     """Set up the test environment."""

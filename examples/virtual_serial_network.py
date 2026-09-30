@@ -90,7 +90,6 @@ if __name__ == "__main__":
     print(f"VSN 2 talk port: {vsn2_talk_port}")
     print(f"VSN 2 read port: {vsn2_read_port}")
 
-    # pylint: disable=consider-using-with
     vsn1_w_port = open(vsn1_talk_port, "wb", buffering=0)
     vsn1_r_port = open(vsn1_read_port, "rb", buffering=0)
 

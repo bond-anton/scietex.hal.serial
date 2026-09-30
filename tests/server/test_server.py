@@ -18,7 +18,7 @@ except ModuleNotFoundError:
 
 
 @pytest.mark.asyncio
-async def test_initialization(logger_fixture, single_slave_fixture, store_fixture):  # pylint: disable=redefined-outer-name
+async def test_initialization(logger_fixture, single_slave_fixture, store_fixture):
     """Test that the RS485Server initializes correctly."""
     # Test initialization without a logger
     config = Config("COM1", timeout=None)
@@ -47,12 +47,11 @@ async def test_initialization(logger_fixture, single_slave_fixture, store_fixtur
 
 
 @pytest.mark.asyncio
-async def test_start_stop_restart(logger_fixture, server_config):  # pylint: disable=redefined-outer-name
+async def test_start_stop_restart(logger_fixture, server_config):
     """Test that the start(), stop(), and stop() methods work correctly."""
 
     server = RS485Server(server_config, logger=logger_fixture)
 
-    # pylint: disable=protected-access
     assert server._task is None
     await server.start()
     assert server._task is not None
@@ -71,7 +70,7 @@ async def test_start_stop_restart(logger_fixture, server_config):  # pylint: dis
 
 
 @pytest.mark.asyncio
-async def test_update_slaves(rs485_srv, store_fixture):  # pylint: disable=redefined-outer-name
+async def test_update_slaves(rs485_srv, store_fixture):
     """Test update devices."""
     await rs485_srv.start()
     await rs485_srv.remove_slave(1)
@@ -84,7 +83,7 @@ async def test_update_slaves(rs485_srv, store_fixture):  # pylint: disable=redef
 
 
 @pytest.mark.asyncio
-async def test_read_registers(rs485_srv, client_config):  # pylint: disable=redefined-outer-name
+async def test_read_registers(rs485_srv, client_config):
     """Test read registers."""
     await rs485_srv.start()
     client = AsyncModbusSerialClient(**modbus_connection_config(client_config))
@@ -106,7 +105,7 @@ async def test_read_registers(rs485_srv, client_config):  # pylint: disable=rede
 
 
 @pytest.mark.asyncio
-async def test_write_registers(rs485_srv, client_config):  # pylint: disable=redefined-outer-name
+async def test_write_registers(rs485_srv, client_config):
     """Test write registers."""
     await rs485_srv.start()
     client = AsyncModbusSerialClient(**modbus_connection_config(client_config))

@@ -93,7 +93,6 @@ class RS485Client:
             The logger instance used for logging client activities.
     """
 
-    # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-instance-attributes
     def __init__(
         self,
         con_params: SerialConnectionConfigModel | ModbusSerialConnectionConfigModel,
@@ -450,7 +449,6 @@ class RS485Client:
             return float_from_int(response, factor)
         return None
 
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
     async def write_register_float(
         self,
         register: int,
@@ -549,7 +547,6 @@ class RS485Client:
         self.logger.debug("Invalid response: expected 2 registers, got %s", response)
         return None
 
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
     async def read_two_registers_float(
         self,
         start_register: int,
@@ -604,7 +601,6 @@ class RS485Client:
         self.logger.debug("Failed to read registers for float conversion.")
         return None
 
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
     async def write_two_registers(
         self,
         start_register: int,
@@ -669,7 +665,6 @@ class RS485Client:
             raise_on_error=False,
         )
 
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
     async def write_two_registers_float(
         self,
         start_register: int,

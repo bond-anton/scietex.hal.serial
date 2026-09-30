@@ -56,7 +56,6 @@ SERVER_INFO = {
 }
 
 
-# pylint: disable=too-many-instance-attributes
 class RS485Server:
     """
     RS485 Modbus Serial Server.
@@ -82,7 +81,6 @@ class RS485Server:
         - restart(self): Restarts the server after stopping it.
     """
 
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
     def __init__(
         self,
         con_params: SerialConnectionConfigModel | ModbusSerialConnectionConfigModel,
