@@ -185,11 +185,28 @@ is new — it encodes the standard↔vendor mapping.
 Extends the base design's phases:
 
 1. **Plugin loader + exceptions** — add `resolve_translator` / `load_class` for
-   `GatewayTranslator`.
-2. **Config dataclasses + validation** — add `translator` field + validation.
+   `GatewayTranslator`. ✅ done
+2. **Config dataclasses + validation** — add `translator` field + validation. ✅ done
 3. **Forwarding core** — add translator dispatch in `_on_request`; pass-through
-   when `None`.
-4. **TCP server + end-to-end wiring** — test with a real vendor device emulator
-   (reuse `ThyracontEmulator` from `vacuum_gauge` as the serial-side device).
+   when `None`. ✅ done
+4. **TCP server + end-to-end wiring** — verified with a **synthetic vendor
+   plugin** in `tests/gateway/vendor_stub/` (PDU + framer + decoder +
+   translator) and a `VendorEmulator` on the serial side. A real vendor package
+   (`vacuum_gauge`) is deliberately *not* a dependency: it would couple the two
+   repos and it is currently broken against pymodbus 3.15. ✅ done
 5. **Public API + full gate** — export `GatewayTranslator` from
-   `scietex.hal.serial`.
+   `scietex.hal.serial`. ✅ done
+
+### Verification note
+
+The synthetic stub doubles as a worked example of the plugin contract. It is
+resolved by dotted path (`tests.gateway.vendor_stub.*`) exactly as a real plugin
+would be, so the test exercises the same resolution, framer-swap, translator
+dispatch and error-mapping code paths as production.
+
+`vacuum_gauge` readiness (investigated, not implemented): the v1 PDU/framer/
+decoder are resolvable and work through the generic `buildFrame` path (the
+command rides in `function_code`). The missing artifact is a
+`ThyracontTranslator`; the emulator also needs a pymodbus 3.15 fix
+(`ModbusDeviceContext.store` no longer exists). Both belong to the
+`vacuum_gauge` repo, not this one.
