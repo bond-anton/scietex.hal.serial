@@ -9,8 +9,6 @@ The vendor plugin lives in ``tests/gateway/vendor_stub`` and is resolved by
 dotted path, exactly as a real plugin package would be.
 """
 
-import socket
-
 import pytest
 from pymodbus.client import AsyncModbusTcpClient
 
@@ -28,13 +26,6 @@ _DECODER = "tests.gateway.vendor_stub.decoder.VendorDecodePDU"
 _TRANSLATOR = "tests.gateway.vendor_stub.translator.VendorTranslator"
 
 
-def _free_port() -> int:
-    """Pick a free TCP port."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return sock.getsockname()[1]
-
-
 @pytest.fixture
 def vendor_device(vsp_fixture, logger_fixture):
     """A synthetic vendor emulator on one end of the virtual pair."""
@@ -43,9 +34,9 @@ def vendor_device(vsp_fixture, logger_fixture):
 
 
 @pytest.fixture
-def gateway_stack(vsp_fixture, logger_fixture):
+def gateway_stack(vsp_fixture, logger_fixture, free_port):
     """A started gateway + TCP server wired to the vendor plugin."""
-    port = _free_port()
+    port = free_port
     serial = ModbusSerialConnectionConfig(vsp_fixture.serial_ports[1], timeout=0.5)
     config = GatewayConfig(
         serial=serial,

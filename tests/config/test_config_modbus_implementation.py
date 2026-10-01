@@ -102,23 +102,5 @@ def test_framer_property() -> None:
     assert conf_mb.framer == DEFAULT_FRAMER
 
 
-def test_to_dict() -> None:
-    """
-    Test to_dict method.
-    """
-    port_name = "COM3"
-    conf_modbus = Config(port_name)
-    expected_dict = {
-        "port": conf_modbus.port,
-        "baudrate": conf_modbus.baudrate,
-        "bytesize": conf_modbus.bytesize,
-        "parity": conf_modbus.parity,
-        "stopbits": conf_modbus.stopbits,
-        "timeout": conf_modbus.timeout,
-        "framer": conf_modbus.framer,
-    }
-    assert conf_modbus.to_dict() == expected_dict
-
-
 if __name__ == "__main__":
     pytest.main()

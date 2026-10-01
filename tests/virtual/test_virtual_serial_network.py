@@ -33,25 +33,28 @@ def test_initialization(logger_fixture):
     assert isinstance(vsn_with_logger.logger, Logger)
 
 
-def test_start_stop(vsn_fixture):
+def test_start_stop(logger_fixture):
     """Test that the start() and stop() methods work correctly."""
     virtual_ports_num = 3
+    vsn = VirtualSerialNetwork(virtual_ports_num=virtual_ports_num, logger=logger_fixture)
+    vsn.start()
+
     # Verify that serial ports are created
-    assert vsn_fixture.virtual_ports_num == virtual_ports_num
+    assert vsn.virtual_ports_num == virtual_ports_num
     for i in range(virtual_ports_num):
-        assert vsn_fixture.serial_ports[i] is not None
-        assert os.path.exists(vsn_fixture.serial_ports[i])
+        assert vsn.serial_ports[i] is not None
+        assert os.path.exists(vsn.serial_ports[i])
 
     # Verify that the process is running
-    assert vsn_fixture._VirtualSerialNetwork__p is not None
-    assert vsn_fixture._VirtualSerialNetwork__p.is_alive()
+    assert vsn._VirtualSerialNetwork__p is not None
+    assert vsn._VirtualSerialNetwork__p.is_alive()
 
     # Stop the process
-    vsn_fixture.stop()
+    vsn.stop()
 
     # Verify that resources are cleaned up
-    assert vsn_fixture._VirtualSerialNetwork__p is None
-    assert vsn_fixture.serial_ports == []
+    assert vsn._VirtualSerialNetwork__p is None
+    assert vsn.serial_ports == []
 
 
 def test_vsn_init_external_ports(vsn_fixture, logger_fixture):

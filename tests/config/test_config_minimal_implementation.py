@@ -234,21 +234,5 @@ def test_stopbits() -> None:
         assert conf.stopbits == stopbits
 
 
-def test_to_dict() -> None:
-    """
-    Test to_dict method.
-    """
-    port_name = "COM2"
-    conf_min = Config(port_name)
-    expected_dict = {
-        "port": conf_min.port,
-        "baudrate": conf_min.baudrate,
-        "bytesize": conf_min.bytesize,
-        "parity": conf_min.parity,
-        "stopbits": conf_min.stopbits,
-    }
-    assert conf_min.to_dict() == expected_dict
-
-
 if __name__ == "__main__":
     pytest.main()

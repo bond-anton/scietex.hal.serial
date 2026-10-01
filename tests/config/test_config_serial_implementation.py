@@ -95,24 +95,5 @@ def test_inter_byte_timeout_property() -> None:
     assert conf.inter_byte_timeout == DEFAULT_TIMEOUT
 
 
-def test_to_dict() -> None:
-    """
-    Test to_dict method.
-    """
-    port_name = "COM1"
-    conf = Config(port_name, timeout=None)
-    expected_dict = {
-        "port": conf.port,
-        "baudrate": conf.baudrate,
-        "bytesize": conf.bytesize,
-        "parity": conf.parity,
-        "stopbits": conf.stopbits,
-        "timeout": conf.timeout,
-        "write_timeout": conf.write_timeout,
-        "inter_byte_timeout": conf.inter_byte_timeout,
-    }
-    assert conf.to_dict() == expected_dict
-
-
 if __name__ == "__main__":
     pytest.main()

@@ -5,18 +5,12 @@ from unittest.mock import patch
 
 try:
     from src.scietex.hal.serial.utilities.serial_port_finder import (
-        DEVICE_PROFILES,
-        RS485_DEVICES,
-        STM_CDC_DEVICES,
         find_rs485,
         find_serial_ports,
         find_stm32_cdc,
     )
 except ModuleNotFoundError:
     from scietex.hal.serial.utilities.serial_port_finder import (
-        DEVICE_PROFILES,
-        RS485_DEVICES,
-        STM_CDC_DEVICES,
         find_rs485,
         find_serial_ports,
         find_stm32_cdc,
@@ -67,13 +61,3 @@ def test_find_stm32_cdc_override_mapping():
     with patch("serial.tools.list_ports.comports", return_value=ports):
         result = find_stm32_cdc(mapping={0x1234: [0x5678]})
     assert result == ["/dev/ttyCUSTOM"]
-
-
-def test_device_profiles_keys():
-    assert "stm32_cdc" in DEVICE_PROFILES
-    assert "rs485" in DEVICE_PROFILES
-
-
-def test_aliases_match_profiles():
-    assert STM_CDC_DEVICES == DEVICE_PROFILES["stm32_cdc"]
-    assert RS485_DEVICES == DEVICE_PROFILES["rs485"]

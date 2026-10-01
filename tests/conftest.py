@@ -23,7 +23,10 @@ except ModuleNotFoundError:
         ReactiveSequentialDataBlock,
         RS485Server,
     )
-    from scietex.hal.serial.virtual import VirtualSerialPair
+    from scietex.hal.serial.virtual import (
+        VirtualSerialNetwork,
+        VirtualSerialPair,
+    )
 
 
 @pytest.fixture
@@ -83,7 +86,7 @@ def server_config(vsp_fixture):
 
 @pytest.fixture
 def client_config(vsp_fixture):
-    """Serial Modbus config for the server."""
+    """Serial Modbus config for the client."""
     config = Config(vsp_fixture.serial_ports[1], timeout=0.5)
     return config
 

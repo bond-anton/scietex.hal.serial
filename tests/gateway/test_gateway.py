@@ -11,45 +11,12 @@ from pymodbus.pdu.register_message import (
 
 try:
     from src.scietex.hal.serial.config import ModbusSerialConnectionConfig
-    from src.scietex.hal.serial.gateway.config import (
-        GatewayConfig,
-        GatewayDeviceConfig,
-    )
+    from src.scietex.hal.serial.gateway.config import GatewayConfig
     from src.scietex.hal.serial.gateway.gateway import ModbusGateway
-    from src.scietex.hal.serial.server.rs485_server import RS485Server
 except ModuleNotFoundError:
     from scietex.hal.serial.config import ModbusSerialConnectionConfig
-    from scietex.hal.serial.gateway.config import (
-        GatewayConfig,
-        GatewayDeviceConfig,
-    )
+    from scietex.hal.serial.gateway.config import GatewayConfig
     from scietex.hal.serial.gateway.gateway import ModbusGateway
-    from scietex.hal.serial.server.rs485_server import RS485Server
-
-
-@pytest.fixture
-def gateway_config(vsp_fixture, single_slave_fixture):
-    """Gateway config bound to one end of the virtual pair."""
-    serial = ModbusSerialConnectionConfig(vsp_fixture.serial_ports[1], timeout=0.5)
-    return GatewayConfig(
-        serial=serial,
-        devices={1: GatewayDeviceConfig(device_id=1, framer="RTU")},
-    )
-
-
-@pytest.fixture
-def gateway(gateway_config, logger_fixture):
-    """A started gateway."""
-    gw = ModbusGateway(gateway_config, logger=logger_fixture)
-    return gw
-
-
-@pytest.fixture
-def bus_server(vsp_fixture, single_slave_fixture, logger_fixture):
-    """An RS485 server on the other end of the virtual pair."""
-    serial = ModbusSerialConnectionConfig(vsp_fixture.serial_ports[0], timeout=0.5)
-    server = RS485Server(serial, devices=single_slave_fixture, logger=logger_fixture)
-    return server
 
 
 @pytest.mark.asyncio

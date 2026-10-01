@@ -14,7 +14,11 @@ try:
     )
 except ModuleNotFoundError:
     from scietex.hal.serial.client import RS485Client
-    from scietex.hal.serial.utilities.numeric import ByteOrder
+    from scietex.hal.serial.utilities.numeric import (
+        ByteOrder,
+        combine_32bit,
+        to_signed32,
+    )
 
 
 @pytest.mark.asyncio
@@ -125,9 +129,6 @@ async def test_write_registers(rs485_srv, client_config, logger_fixture):
     assert value == 0.07
     value = await client.write_register_float(register=0, value=-1.07, signed=True)
     assert value == -1.07
-    # Need to check what happens when writing outside the registers range
-    # value = await client.write_register_float(register=101, value=-1.07, signed=True)
-    # assert value is None
     value = await client.write_two_registers(
         start_register=0,
         value=1024365,
@@ -153,11 +154,6 @@ async def test_write_registers(rs485_srv, client_config, logger_fixture):
         start_register=0, value=-10000000.07, signed=True, raise_on_error=False
     )
     assert value == -10000000.07
-    # Need to check what happens when writing outside the registers range
-    # value = await client.write_two_registers_float(
-    #     start_register=101, value=-1.07, signed=True
-    # )
-    # assert value is None
 
     values = [1, 2, 3]
     resp = await client.write_registers(0, values, signed=False, raise_on_error=False)

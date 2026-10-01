@@ -48,9 +48,7 @@ async def main():
     server = RS485Server(ModbusSerialConnectionConfig(vsp.serial_ports[0]))
     await server.start()
 
-    async with RS485Client(
-        ModbusSerialConnectionConfig(vsp.serial_ports[1]), address=1
-    ) as client:
+    async with RS485Client(ModbusSerialConnectionConfig(vsp.serial_ports[1]), address=1) as client:
         await client.write_register_float(register=0, value=3.14159, factor=100)
         print(await client.read_register_float(register=0, factor=100))
 
