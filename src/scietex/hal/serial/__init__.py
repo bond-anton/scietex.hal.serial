@@ -6,6 +6,15 @@ from .config import (
     SerialConnectionConfig,
     SerialConnectionMinimalConfig,
 )
+from .gateway import (
+    GatewayConfig,
+    GatewayConfigError,
+    GatewayDeviceConfig,
+    GatewayError,
+    GatewayTcpServer,
+    GatewayTranslator,
+    ModbusGateway,
+)
 from .server import ReactiveSequentialDataBlock, RS485Server
 from .utilities import (
     ByteOrder,
@@ -32,6 +41,13 @@ __all__ = [
     "RS485Client",
     "RS485Server",
     "ReactiveSequentialDataBlock",
+    "GatewayConfig",
+    "GatewayDeviceConfig",
+    "GatewayConfigError",
+    "GatewayError",
+    "GatewayTranslator",
+    "ModbusGateway",
+    "GatewayTcpServer",
     "check_sum",
     "lrc",
     "check_lrc",

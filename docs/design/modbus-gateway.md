@@ -6,6 +6,10 @@ Last updated: 2026-09-30
 A serial↔TCP Modbus gateway for `scietex.hal.serial`. This document records the
 settled design so implementation can resume without re-deriving it.
 
+This document covers **Modbus devices** (RTU/ASCII framing differences only).
+For devices that speak a **non-Modbus vendor protocol**, see the companion
+document `modbus-gateway-nonstandard.md` (translator-PDU path).
+
 ## Goal
 
 A gateway that owns one physical serial port (RS485 bus) and routes Modbus
@@ -25,8 +29,9 @@ selecting framer/decoder/PDU per device from configuration.
 | Config provisioning | **Out of scope** — a future separate service project (built on `scietex.service`) owns config files, config-dir resolution, and ENV overrides |
 | Dependencies | **Unchanged** — still only `pymodbus[serial] ~= 3.15` (no `pyyaml`/`msgspec`) |
 | Plugin mechanism | **Dotted-path strings** in the config dataclass (e.g. `"mypackage.MyFramer"`), resolved by a loader |
-| Built-in framers | `"rtu"`, `"ascii"` shortcuts; `"socket"`/`"tls"` excluded (serial bus) |
-| Default framer | `default_framer: "rtu" \| "ascii"` field on the config dataclass |
+| Non-standard devices | **Translator PDU** — a plugin `GatewayTranslator` maps standard Modbus ↔ vendor protocol; see `modbus-gateway-nonstandard.md` |
+| Built-in framers | `"RTU"`, `"ASCII"` shortcuts (uppercase, matching `FramerType` and `ModbusSerialConnectionConfig.framer`); `"SOCKET"`/`"TLS"` excluded (serial bus) |
+| Default framer | `default_framer: "RTU" \| "ASCII"` field on the config dataclass |
 | Framer swap | **Smart** — swap only when the target framer differs from the currently-installed one; no restore-to-default after each request |
 | Concurrency | One `asyncio.Lock` around swap+execute (the bus is one physical line) |
 | Unknown device id | `allow_unknown_devices` flag; default `False` → reject with exception 0x0B |
@@ -96,10 +101,11 @@ New package `src/scietex/hal/serial/gateway/` (mirrors `server/`/`client/`):
 | File | Responsibility |
 | --- | --- |
 | `exceptions.py` | `GatewayConfigError`, `GatewayError` |
-| `plugin_loader.py` | `resolve_framer`/`resolve_decoder`/`resolve_pdu`/`build_framer`/`load_class` |
+| `plugin_loader.py` | `resolve_framer`/`resolve_decoder`/`resolve_pdu`/`resolve_translator`/`build_framer`/`load_class` |
 | `config.py` | `GatewayConfig`, `GatewayDeviceConfig` — **dataclasses only**, no file I/O |
+| `translator.py` | `GatewayTranslator` protocol — standard Modbus ↔ vendor protocol mapping (see `modbus-gateway-nonstandard.md`) |
 | `tcp_server.py` | `GatewayTcpServer` — asyncio server, `FramerSocket` decode, per-connection buffering |
-| `gateway.py` | `ModbusGateway` — bus ownership, framer cache, smart swap, lock, error mapping |
+| `gateway.py` | `ModbusGateway` — bus ownership, framer cache, smart swap, lock, translator dispatch, error mapping |
 
 ## Config dataclasses
 
@@ -109,16 +115,18 @@ Constructed in code (by the future service), not parsed from a file:
 @dataclass(slots=True)
 class GatewayDeviceConfig:
     device_id: int
-    framer: str = "rtu"          # "rtu" | "ascii" | dotted path
-    decoder: str | None = None   # dotted path
+    framer: str = "RTU"  # "RTU" | "ASCII" | dotted path
+    decoder: str | None = None  # dotted path
     pdus: list[str] = field(default_factory=list)  # dotted paths
+    translator: str | None = None  # dotted path to GatewayTranslator; None = pass-through
+
 
 @dataclass(slots=True)
 class GatewayConfig:
-    serial: ModbusSerialConnectionConfig   # reuse existing config model
+    serial: ModbusSerialConnectionConfig  # reuse existing config model
     host: str = "0.0.0.0"
     port: int = 502
-    default_framer: str = "rtu"            # "rtu" | "ascii"
+    default_framer: str = "RTU"  # "RTU" | "ASCII"
     devices: dict[int, GatewayDeviceConfig] = field(default_factory=dict)
     allow_unknown_devices: bool = False
     bus_retries: int = 0
@@ -137,8 +145,8 @@ config. Lean: reuse it, document that `default_framer` wins.
 ```python
 async def _on_request(self, dev_id, tid, request):
     async with self._lock:
-        target = self._framer_for(dev_id)          # cached FramerBase instance
-        if self._current_framer is not target:     # only swap when different
+        target = self._framer_for(dev_id)  # cached FramerBase instance
+        if self._current_framer is not target:  # only swap when different
             self._bus.ctx.framer = target
             self._current_framer = target
         response = await self._bus.execute(False, request)
@@ -155,15 +163,15 @@ Custom asyncio server (NOT `ModbusTcpServer`). Per connection:
 
 ```python
 decoder = DecodePDU(True)
-for pdu_cls in self._request_pdus:      # union of custom request PDUs from config
+for pdu_cls in self._request_pdus:  # union of custom request PDUs from config
     decoder.register(pdu_cls)
-framer = FramerSocket(decoder)          # per connection (no state bleed)
+framer = FramerSocket(decoder)  # per connection (no state bleed)
 buffer = b""
 while chunk := await reader.read(4096):
     buffer += chunk
     while buffer:
         used, dev_id, tid, pdu_bytes = framer.decode(buffer)
-        if used == 0:                   # incomplete -> wait for more
+        if used == 0:  # incomplete -> wait for more
             break
         buffer = buffer[used:]
         await self._dispatch(writer, dev_id, tid, pdu_bytes)
@@ -174,7 +182,7 @@ function code is prefixed by the framer):
 
 ```python
 payload = pdu.function_code.to_bytes(1, "big") + pdu.encode()
-frame = FramerSocket.encode(payload, dev_id, tid)   # echoes the client's TID
+frame = FramerSocket.encode(payload, dev_id, tid)  # echoes the client's TID
 ```
 
 ## Phased delivery
@@ -182,13 +190,17 @@ frame = FramerSocket.encode(payload, dev_id, tid)   # echoes the client's TID
 Each phase is a separate PR. **Gate per phase:** `ruff format --check` →
 `ruff check` → `ty check src` → `tox -e py314`.
 
-1. **Plugin loader + exceptions** — dotted-path resolution, built-in `"rtu"`/`"ascii"`.
-2. **Config dataclasses + validation** — no file I/O.
+1. **Plugin loader + exceptions** — dotted-path resolution, built-in `"RTU"`/`"ASCII"`,
+   `resolve_translator`. ✅ done
+2. **Config dataclasses + validation** — no file I/O; `translator` field. ✅ done
 3. **Forwarding core** (`ModbusGateway`, no TCP yet) — spike already passed; smart
-   swap, lock, broadcast, error mapping.
+   swap, lock, broadcast, translator dispatch, error mapping. ✅ done
 4. **TCP server + end-to-end wiring** — `GatewayTcpServer`, real
-   `AsyncModbusTcpClient` ↔ gateway ↔ pty ↔ `RS485Server` tests.
-5. **Public API + full gate** — export from `scietex.hal.serial`, run full `tox`.
+   `AsyncModbusTcpClient` ↔ gateway ↔ pty ↔ `RS485Server` tests. ✅ done
+5. **Public API + full gate** — export from `scietex.hal.serial`, run full `tox`. ✅ done
+
+Non-standard (vendor-protocol) devices are covered by
+`modbus-gateway-nonstandard.md`, which extends phases 1–5 above.
 
 ## Testing (no hardware)
 
@@ -203,7 +215,8 @@ config, partial/coalesced TCP frames, lifecycle.
 1. **Framer swap concurrency** — mitigated by the lock; **spike passed**, so
    de-risked.
 2. **Partial/coalesced TCP frames** — `FramerSocket.decode` returns `used==0` for
-   incomplete frames; needs a max-buffer guard (open item).
+   incomplete frames; a per-connection max-buffer guard (`_MAX_BUFFER`, 64 KiB)
+   drops a connection that never completes a frame.
 3. **TID echo** — `TransactionManager` overwrites the request TID; the TCP TID
    must be captured server-side and echoed.
 4. **Custom decoder contract** — must accept a single positional `is_server: bool`;
