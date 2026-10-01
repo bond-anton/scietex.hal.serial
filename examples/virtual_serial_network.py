@@ -1,4 +1,8 @@
-"""Example of VirtualSerialNetwork class usage."""
+"""Example of VirtualSerialNetwork class usage.
+
+Bridges two virtual serial networks through a shared external port, so a payload written from one
+network is forwarded to the other.
+"""
 
 import logging
 import time
@@ -10,14 +14,6 @@ def get_colored_logger(name, level=logging.DEBUG):
     """Creates a logger with colored output based on the log level."""
     data_logger = logging.getLogger(name)
     data_logger.setLevel(level)
-
-    handler = logging.StreamHandler()
-    handler.setLevel(level)
-
-    formatter = logging.Formatter(
-        "%(asctime)s %(levelname)8s %(name)s → %(message)s", datefmt="%H:%M:%S"
-    )
-    handler.setFormatter(formatter)
 
     class ColorFormatter(logging.Formatter):
         """Custom formatter to add colors to log messages based on their level."""
@@ -35,6 +31,8 @@ def get_colored_logger(name, level=logging.DEBUG):
             msg = super().format(record)
             return f"{color}{msg}\x1b[0m"
 
+    handler = logging.StreamHandler()
+    handler.setLevel(level)
     handler.setFormatter(
         ColorFormatter("%(asctime)s %(levelname)8s %(name)s → %(message)s", datefmt="%H:%M:%S")
     )
@@ -54,20 +52,23 @@ if __name__ == "__main__":
     vsn1.start()
     print(f"VSN 1 ports: {vsn1.serial_ports}")
 
+    shared_port = vsn1.serial_ports[0]
+    print(f"Shared port: {shared_port}")
+
     vsn2 = VirtualSerialNetwork(
-        virtual_ports_num=2,
+        virtual_ports_num=0,
+        external_ports=[SerialConnectionConfig(port=shared_port)],
         logger=logger,
         data_log_dir="data_logs/vsn2",
         data_logging_splitter=b"\n",
     )
     vsn2.start()
-
-    shared_port = vsn1.serial_ports[0]
-    print(f"Shared port: {shared_port}")
-    vsn2.add([SerialConnectionConfig(shared_port)])
+    print(f"VSN 2 ports: {vsn2.serial_ports}")
 
     # Create two more virtual ports
     vsn2.create(2)
+
+    print(f"VSN 2 ports: {vsn2.serial_ports}")
 
     vsn1_talk_port = vsn1.serial_ports[1]
     vsn1_read_port = vsn1.serial_ports[2]
@@ -81,9 +82,6 @@ if __name__ == "__main__":
     while vsn2_read_port in [shared_port, vsn2_talk_port]:
         i += 1
         vsn2_read_port = vsn2.serial_ports[i]
-
-    print(f"VSN 1 ports: {vsn1.serial_ports}")
-    print(f"VSN 2 ports: {vsn2.serial_ports}")
 
     print(f"VSN 1 talk port: {vsn1_talk_port}")
     print(f"VSN 1 read port: {vsn1_read_port}")

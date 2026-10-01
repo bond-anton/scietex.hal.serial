@@ -62,12 +62,11 @@ Entry points are:
   (`src/scietex/hal/serial/__init__.py`).
 - **Examples** (`examples/`, runnable scripts with `if __name__ == "__main__":`):
   - `config.py` — config construction/serialization.
-  - `virtual_serial_pair.py`, `virtual_serial_network.py`,
-    `virtual_serial_network2.py` — virtual network usage.
+  - `virtual_serial_pair.py`, `virtual_serial_network.py` — virtual network usage.
   - `modbus_server.py`, `modbus_client.py` — server/client over a virtual pair.
-  - `rs485_custom_request.py` — custom framer/decoder/PDU example (365 lines).
+  - `rs485_custom_request.py` — custom framer/decoder/PDU example.
   - `find_serial_ports.py` — VID/PID port discovery.
-  - `gateway.py` — serial↔TCP Modbus gateway (being added separately).
+  - `gateway.py` — serial↔TCP Modbus gateway.
 - **Tests** (`tests/`) exercise the library through the same public API.
 
 ## Runtime processes

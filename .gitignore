@@ -8,5 +8,6 @@
 __pycache__
 build
 /site
+/data_logs
 .vscode
 uv.lock
