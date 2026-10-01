@@ -18,7 +18,7 @@ dynamic = ["version"]
 "Homepage" = "https://github.com/bond-anton/scietex.hal.serial"
 
 [project.optional-dependencies]
-all = ["scietex.hal.serial[dev,test,lint]"]
+all = ["scietex.hal.serial[dev,test,lint,docs]"]
 dev = ["tox>=4.46.0"]
 lint = ["ruff", "ty"]
 test = [
@@ -26,6 +26,11 @@ test = [
   "pytest-asyncio",
   "pytest-timeout>=2.4.0",
   "pytest-xdist",
+]
+docs = [
+  "mkdocs>=1.6",
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.27",
 ]
 
 [build-system]

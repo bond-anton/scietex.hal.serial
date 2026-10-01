@@ -12,18 +12,19 @@ scietex.hal.serial/
 │   ├── virtual/                   # virtual serial network
 │   ├── server/                    # Modbus/RS485 server
 │   ├── client/                    # Modbus/RS485 client
-│   └── utilities/                 # helpers (modbus, numeric, checksum, finder, mock)
+│   ├── gateway/                   # serial↔TCP Modbus gateway
+│   └── utilities/                 # helpers (modbus, numeric, checksum, finder, exceptions)
 ├── tests/                         # mirrors src/ module structure
 │   ├── conftest.py                # shared fixtures
-│   ├── config/  virtual/  server/  client/  utilities/
+│   ├── config/  virtual/  server/  client/  utilities/  gateway/
 │   └── test_version.py
 ├── examples/                      # runnable usage scripts (linted)
 ├── docs/architecture/             # this map
-├── pyproject.toml                 # build, deps, mypy, pytest config
-├── pytest.ini                     # overrides pyproject pytest config
-├── tox.ini                        # env_list: format, lint, type, py314
+├── pyproject.toml                 # build, deps, extras, coverage config
+├── pytest.ini                     # pytest config (pythonpath, timeout)
+├── tox.ini                        # env_list: format, lint, type, py{310,312,314}
 ├── cspell.json                    # project word list
-└── .github/workflows/             # python-package.yml, pylint.yml, python-publish.yml
+└── .github/workflows/             # python-package.yml, python-lint.yml, python-publish.yml
 ```
 
 ## Namespace-package boundary
@@ -73,25 +74,40 @@ implicit namespace packages. The first real package is
 
 | Module | Responsibility |
 | --- | --- |
-| `modbus.py` | `modbus_connection_config`, `modbus_get_client`, `modbus_execute`, `modbus_read_registers`, `modbus_read_input_registers`, `modbus_read_holding_registers`, `modbus_write_registers`, `modbus_write_register` |
+| `modbus.py` | `modbus_connection_config`, `modbus_connection`, `modbus_get_client`, `modbus_execute`, `modbus_read_registers`, `modbus_read_input_registers`, `modbus_read_holding_registers`, `modbus_write_registers`, `modbus_write_register` |
 | `numeric.py` | `ByteOrder` enum; signed/unsigned 16/32-bit conversions; float scaling; `split_32bit`/`combine_32bit` |
 | `checksum.py` | `check_sum` (CRC-16/Modbus), `lrc`, `check_lrc` |
-| `serial_port_finder.py` | `find_serial_ports`, `find_stm32_cdc`, `find_rs485`; VID/PID constants |
-| `mock.py` | `mock_openpty` (raises `OSError`) for error-path tests |
-| `__init__.py` | Empty (no re-exports) |
+| `serial_port_finder.py` | `find_serial_ports`, `find_stm32_cdc`, `find_rs485`; `DEVICE_PROFILES` registry |
+| `exceptions.py` | `ModbusOperationError` |
+| `__init__.py` | Re-exports the stable public helpers (`__all__`) |
+
+### `gateway/`
+
+| Module | Responsibility |
+| --- | --- |
+| `config.py` | `GatewayConfig`, `GatewayDeviceConfig`; validation in `__post_init__`; fail-fast plugin resolvability checks |
+| `exceptions.py` | `GatewayConfigError(ValueError)`, `GatewayError(Exception)` |
+| `plugin_loader.py` | `load_class`, `resolve_framer`, `resolve_decoder`, `resolve_pdu`, `resolve_translator`, `build_framer` |
+| `translator.py` | `GatewayTranslator` protocol (`to_vendor`/`to_standard`) for non-Modbus vendor protocols |
+| `tcp_server.py` | `GatewayTcpServer`: custom asyncio Modbus/TCP front end using `FramerSocket` |
+| `gateway.py` | `ModbusGateway`: forwarding core; owns the serial bus, routes by device id, swaps the framer per device |
+| `__init__.py` | Re-exports the gateway config/exception/server/translator symbols |
 
 ## Boundaries between components
 
 - **`config` ↔ everything**: `config` is imported by `virtual`, `server`,
-  `client`, `utilities.modbus`. Nothing in `config` imports those modules.
+  `client`, `gateway`, `utilities.modbus`. Nothing in `config` imports those
+  modules.
 - **`virtual` ↔ Modbus stack**: no import edge in either direction. They meet
   only at runtime through OS pseudo-terminal device paths (`serial_ports`).
 - **`client` ↔ `server`**: no import edge. They meet at runtime over a serial
   port (real or virtual).
+- **`gateway` ↔ endpoints**: `gateway` depends on `config` and pymodbus; it does
+  not import `client`/`server`/`virtual`. It is a standalone protocol endpoint.
 - **`utilities` ↔ endpoints**: `client` and `server` import `utilities.modbus`;
   `client` also imports `utilities.numeric`. `utilities.modbus` imports `config`.
-- **`utilities` internal**: `numeric`, `checksum`, `mock`, `serial_port_finder`
-  are leaves; `modbus` depends on `config`.
+- **`utilities` internal**: `numeric`, `checksum`, `serial_port_finder`,
+  `exceptions` are leaves; `modbus` depends on `config`.
 
 ## Test structure
 
@@ -104,6 +120,7 @@ implicit namespace packages. The first real package is
 | `tests/server/` | `RS485Server` lifecycle + custom framer/decoder/PDU |
 | `tests/client/` | `RS485Client` read/write paths |
 | `tests/utilities/` | checksum, numeric, modbus helpers |
+| `tests/gateway/` | gateway config, forwarding core, plugin loader, TCP server, translator end-to-end |
 | `tests/test_version.py` | version string format |
 
 `tests/conftest.py` provides `logger_fixture`, `store_fixture`,
@@ -112,14 +129,14 @@ implicit namespace packages. The first real package is
 
 ## Configuration files
 
-- `pyproject.toml` — build (setuptools), deps, extras (`dev`/`test`/`lint`),
-  dynamic version, `[tool.mypy] python_version = "3.10"`,
-  `[tool.pytest.ini_options] pythonpath = ["src"]`.
+- `pyproject.toml` — build (setuptools), deps, extras (`all`/`dev`/`test`/`lint`),
+  dynamic version, `[tool.coverage.run]` (multiprocessing + parallel).
 - `pytest.ini` — `pythonpath = .`, `addopts = --capture=no`,
   `asyncio_default_fixture_loop_scope = session`, `timeout = 10`,
-  `timeout_method = signal`. **Overrides** the pyproject pytest section.
-- `tox.ini` — envs `format` (black), `lint` (pylint src tests examples),
-  `type` (mypy src), `py{314}` (coverage + pytest).
+  `timeout_method = signal`.
+- `tox.ini` — `env_list = format, lint, type, py{310,312,314}`: `format` (ruff
+  format), `lint` (ruff check), `type` (ty check src), `py{...}` (coverage +
+  pytest).
 - `cspell.json` — spellcheck word list.
-- `.github/workflows/` — `python-package.yml` (flake8 + pytest, matrix
-  3.10/3.12/3.14), `pylint.yml`, `python-publish.yml` (PyPI on release).
+- `.github/workflows/` — `python-package.yml` (pytest, matrix 3.10/3.12/3.14),
+  `python-lint.yml` (ruff check), `python-publish.yml` (PyPI on release).

@@ -21,7 +21,14 @@ config/ ─────────────► utilities/modbus.py ───
    │
    ├──────────────► virtual/virtual_serial_network.py ──► virtual/worker.py
    │                          ▲
-   └──────────────► virtual/virtual_serial_pair.py
+   ├──────────────► virtual/virtual_serial_pair.py
+   │
+   └──────────────► gateway/config.py ──► gateway/plugin_loader.py
+                          ▲                       │
+                          │                       └──► gateway/translator.py
+                    gateway/gateway.py
+                          ▲
+                    gateway/tcp_server.py
 ```
 
 Edges (source → target):
@@ -41,7 +48,19 @@ Edges (source → target):
 | `virtual/virtual_serial_network.py` | `config` | `SerialConnectionMinimalConfig` |
 | `virtual/virtual_serial_pair.py` | `virtual.virtual_serial_network` | `VirtualSerialNetwork` |
 | `virtual/virtual_serial_pair.py` | `config` | `SerialConnectionMinimalConfig` |
-| `__init__.py` | `version`, `config`, `virtual`, `client`, `server` | public re-exports |
+| `gateway/config.py` | `config` | `ModbusSerialConnectionConfigModel` |
+| `gateway/config.py` | `gateway.plugin_loader` | `resolve_decoder`, `resolve_framer`, `resolve_pdu`, `resolve_translator` |
+| `gateway/config.py` | `gateway.exceptions` | `GatewayConfigError` |
+| `gateway/gateway.py` | `gateway.config` | `GatewayConfig`, `GatewayDeviceConfig` |
+| `gateway/gateway.py` | `gateway.plugin_loader` | `build_framer`, `resolve_decoder`, `resolve_framer`, `resolve_pdu`, `resolve_translator` |
+| `gateway/gateway.py` | `gateway.exceptions` | `GatewayError` |
+| `gateway/tcp_server.py` | `gateway.config` | `GatewayConfig` |
+| `gateway/tcp_server.py` | `gateway.gateway` | `ModbusGateway` |
+| `gateway/tcp_server.py` | `gateway.plugin_loader` | `resolve_pdu` |
+| `gateway/plugin_loader.py` | `gateway.exceptions` | `GatewayConfigError` |
+| `gateway/plugin_loader.py` | `gateway.translator` | `GatewayTranslator` (lazy import) |
+| `gateway/translator.py` | `pymodbus` | `ModbusPDU` |
+| `__init__.py` | `version`, `config`, `virtual`, `client`, `server`, `gateway`, `utilities` | public re-exports |
 
 ## Dependency direction
 
@@ -51,12 +70,15 @@ Edges (source → target):
   module that converts config objects into pymodbus parameters.
 - **`client` and `server` are siblings.** Neither imports the other. They share
   `config` and `utilities.modbus` but are otherwise independent.
+- **`gateway` is a third protocol endpoint.** It depends on `config` (the
+  connection model), its own `plugin_loader`/`translator`, and pymodbus. It does
+  not import `client`/`server`/`virtual`.
 - **`virtual` is orthogonal to the Modbus stack.** It depends only on `config`
   (for external-port descriptors). No Modbus module imports `virtual`, and
   `virtual` imports no Modbus module. The coupling is runtime-only (device
   paths).
-- **`utilities.numeric`, `utilities.checksum`, `utilities.mock`,
-  `utilities.serial_port_finder` are leaves** with no intra-package imports.
+- **`utilities.numeric`, `utilities.checksum`, `utilities.serial_port_finder`,
+  `utilities.exceptions` are leaves** with no intra-package imports.
 - **`version` is a leaf** imported only by `server` and the package root.
 
 ## Core → infrastructure dependencies
@@ -67,21 +89,27 @@ Edges (source → target):
 | `server/rs485_server.py` | `pymodbus` (`ModbusSerialServer`, `ModbusServerContext`, `ModbusDeviceContext`, `ModbusDeviceIdentification`, `ModbusPDU`, `DecodePDU`, `FramerBase`), `asyncio` |
 | `server/modbus_datablock.py` | `pymodbus` (`ModbusSequentialDataBlock`) |
 | `utilities/modbus.py` | `pymodbus` (`ModbusException`, `FramerType`, `FRAMER_NAME_TO_CLASS`, `TransactionManager`, `AsyncModbusSerialClient`) |
+| `gateway/gateway.py` | `pymodbus` (`AsyncModbusSerialClient`, `FramerBase`, `DecodePDU`, `ModbusPDU`, `TransactionManager`, `ModbusException`), `asyncio` |
+| `gateway/tcp_server.py` | `pymodbus` (`FramerSocket`, `DecodePDU`, `ModbusPDU`), `asyncio` |
+| `gateway/plugin_loader.py` | `pymodbus` (`FramerType`, `FRAMER_NAME_TO_CLASS`, `FramerBase`, `DecodePDU`, `ModbusPDU`) |
+| `gateway/translator.py` | `pymodbus` (`ModbusPDU`) |
 | `virtual/worker.py` | `pyserial` (`serial.Serial`), stdlib `pty`/`selectors`/`multiprocessing`/`signal` |
 | `utilities/serial_port_finder.py` | `pyserial` (`serial.tools.list_ports`) |
 
 `pymodbus` is the single dominant external dependency; it is confined to
-`client`, `server`, and `utilities.modbus`. `pyserial` is used directly in
-`virtual/worker.py` and `utilities/serial_port_finder.py` (and transitively by
-pymodbus's `serial` extra).
+`client`, `server`, `utilities.modbus`, and `gateway`. `pyserial` is used
+directly in `virtual/worker.py` and `utilities/serial_port_finder.py` (and
+transitively by pymodbus's `serial` extra).
 
 ## Cross-module dependencies (summary)
 
 - `client` → `config`, `utilities.modbus`, `utilities.numeric`
 - `server` → `config`, `utilities.modbus`, `version`, `server.modbus_datablock`
+- `gateway` → `config`, `gateway.config`, `gateway.plugin_loader`,
+  `gateway.translator`, `gateway.exceptions`
 - `virtual` → `config`, `virtual.worker`
 - `utilities.modbus` → `config`, `config.defaults`
-- package root → all four subsystems + `version`
+- package root → all six subsystems + `version`
 
 ## Circular dependencies
 
@@ -110,6 +138,11 @@ and `utilities.modbus` depends on `config`; there is no back-edge from
 5. **Config serialization chain**:
    `VirtualSerialNetwork.start`/`add` → `SerialConnectionMinimalConfig.to_dict`
    → dict sent over `Pipe` → `worker.add_external_ports` → `serial.Serial(**dict)`.
+6. **Gateway request chain**:
+   `GatewayTcpServer._dispatch` → `ModbusGateway.handle_request` →
+   `ModbusGateway._forward` → `AsyncModbusSerialClient.execute` → serial bus →
+   (translator `to_standard`) → response PDU → `FramerSocket.encode` → TCP
+   client.
 
 ## Dependency-direction observations (facts)
 

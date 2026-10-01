@@ -7,5 +7,6 @@
 /.coverage
 __pycache__
 build
+/site
 .vscode
 uv.lock

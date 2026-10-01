@@ -1,6 +1,6 @@
 # Design — Non-Standard Protocol Support Path
 
-Status: **agreed, not yet implemented** (target release 2.0.0)
+Status: **implemented** (released in 2.0.0)
 Last updated: 2026-10-01
 
 Extends `docs/design/modbus-gateway.md`. That document covers the frame-level
@@ -115,19 +115,19 @@ TCP client ──FC03 @ addr 0──▶ GatewayTcpServer
 ## Verified technical constraints (pymodbus 3.15.0)
 
 1. **`dev_id` must be set at construction** — `execute()` overwrites
-   `transaction_id` but never `dev_id` (`transaction.py:197`). The gateway sets
-   `vendor_req.dev_id = dev_id` before `execute`.
-2. **`transaction_id` is forced to 0** for ASCII/RTU framers (`getNextTID`,
-   `transaction.py:286-289`). The TCP TID must be captured server-side and
-   echoed (already an open item in the base design).
-3. **Response matching** — `handleFrame` filters by expected `dev_id`/`tid` and
-   stamps the response PDU (`framer/base.py:80-97`). The vendor framer's
-   `decode()` must return `(used_len, dev_id, tid, frame_data)`.
+   `transaction_id` but never `dev_id` (`TransactionManager.execute`). The
+   gateway sets `vendor_req.dev_id = dev_id` before `execute`.
+2. **`transaction_id` is forced to 0** for ASCII/RTU framers
+   (`TransactionManager.getNextTID`). The TCP TID must be captured server-side
+   and echoed (already an open item in the base design).
+3. **Response matching** — `FramerBase.handleFrame` filters by expected
+   `dev_id`/`tid` and stamps the response PDU. The vendor framer's `decode()`
+   must return `(used_len, dev_id, tid, frame_data)`.
 4. **`execute` validates** `response.dev_id == request.dev_id` when
-   `request.dev_id` is truthy (`transaction.py:210-222`). The vendor response
-   must carry the same `dev_id`.
+   `request.dev_id` is truthy (`TransactionManager.execute`). The vendor
+   response must carry the same `dev_id`.
 5. **`DecodePDU.register` maps a class as both request and response**
-   (`decoders.py:61`). Vendor PDUs registered via `pdus` must handle both
+   (`DecodePDU.register`). Vendor PDUs registered via `pdus` must handle both
    directions, or the translator must supply distinct classes.
 6. **`function_code` collision** — vendor PDUs use arbitrary function codes
    (e.g. ASCII `"M"` = 0x4D). The vendor `DecodePDU` must be a custom subclass

@@ -172,7 +172,44 @@ instance; the serial port is opened/closed per operation by `utilities.modbus`.
 
 ---
 
-## 6. Configuration objects
+## 6. `ModbusGateway` + `GatewayTcpServer`
+
+**Construction**:
+- `ModbusGateway(config, logger=None)` stores `config`, `logger`; initializes
+  `_bus = None`, `_lock = asyncio.Lock()`, `_current_framer = None`,
+  `_devices = {}`, `_default_runtime = None`.
+- `GatewayTcpServer(config, gateway, logger=None)` stores `config`, `gateway`,
+  `logger`; sets `_server = None` and collects the union of custom request PDU
+  classes declared across devices.
+
+**Startup**:
+- `ModbusGateway.start()` builds the per-device runtime table
+  (`_build_runtimes`), creates the serial bus (`_create_bus`, with a placeholder
+  framer swapped per request), then `await self._bus.connect()`. Idempotent
+  (`_bus is not None` guard).
+- `GatewayTcpServer.start()` calls `asyncio.start_server(_handle_connection,
+  host, port)`. Idempotent.
+
+**Operation**:
+- Each TCP connection gets its own `FramerSocket` + `DecodePDU`;
+  `_dispatch` forwards decoded requests to `ModbusGateway.handle_request` and
+  writes the encoded response.
+- `ModbusGateway.handle_request` resolves the device runtime; `_forward` swaps
+  the framer (only if it changed) and executes under the bus `_lock`.
+
+**Shutdown**:
+- `GatewayTcpServer.stop()` closes the server and `await wait_closed()`.
+  Idempotent.
+- `ModbusGateway.stop()` closes the serial bus and nulls `_bus`/
+  `_current_framer`. Idempotent.
+
+**Resource ownership**: `ModbusGateway` owns the `AsyncModbusSerialClient` bus
+and the `asyncio.Lock`; `GatewayTcpServer` owns the `asyncio.AbstractServer`
+and the per-connection `FramerSocket`/`DecodePDU`.
+
+---
+
+## 7. Configuration objects
 
 **Lifecycle**: constructed with keyword args; every setter validates and raises
 `SerialConnectionConfigError` on invalid input. `to_dict()` produces the
@@ -221,4 +258,6 @@ when to stop, avoiding double-shutdown races.
 | `ModbusSerialServer` | `RS485Server` | `await stop()` |
 | asyncio task | `RS485Server` | `server.shutdown()` |
 | `AsyncModbusSerialClient` | `RS485Client` | per-operation `close()` |
+| `AsyncModbusSerialClient` (gateway bus) | `ModbusGateway` | `stop()` |
+| `asyncio.AbstractServer` | `GatewayTcpServer` | `stop()` |
 | rotating log handler | worker process | process teardown (handler not explicitly closed) |

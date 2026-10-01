@@ -146,18 +146,19 @@ client↔virtual↔server path, or is coverage split across separate test module
 
 ---
 
-## H11. Version and packaging inconsistencies
+## H11. Version and packaging
 
-**Fact**: `version.py` holds `__version__ = "1.3.0"`; `pyproject.toml` reads it
-dynamically. CI installs `.[all,test]` but no `all` extra exists (only `dev`,
-`test`, `lint`). tox targets `py314`; CI matrix is 3.10/3.12/3.14; README says
-3.9. `pytest.ini` overrides `pyproject.toml` `pythonpath`.
+**Fact**: `version.py` holds `__version__ = "2.0.0"`; `pyproject.toml` reads it
+dynamically. Extras are `all`/`dev`/`test`/`lint`; CI installs `.[dev,test]`
+(package workflow) and `.[dev,test,lint]` (lint workflow). tox `env_list` is
+`format, lint, type, py{310,312,314}`; the CI matrix is 3.10/3.12/3.14.
+`pytest.ini` is the sole `pythonpath` source.
 
 **Question**: which Python versions are actually supported, and does CI pass as
 configured?
 
 **Files**: `pyproject.toml`, `tox.ini`, `pytest.ini`, `README.md`,
-`.github/workflows/python-package.yml`, `.github/workflows/pylint.yml`.
+`.github/workflows/python-package.yml`, `.github/workflows/python-lint.yml`.
 
 ---
 
@@ -167,8 +168,9 @@ configured?
 imported by any `src/` module; it is used by the custom-protocol example and
 tests.
 
-**Question**: is `checksum` intended as public API (it is not re-exported at the
-package root) or as an example/test helper?
+**Question**: is `checksum` intended as public API (its helpers are now
+re-exported at the package root — `check_sum`, `lrc`, `check_lrc`), or as an
+example/test helper?
 
 **Files**: `utilities/checksum.py`, `examples/rs485_custom_request.py`,
 `tests/utilities/`.

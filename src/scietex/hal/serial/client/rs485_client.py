@@ -14,6 +14,7 @@ This module simplifies interaction with Modbus devices over RS485, making it eas
 with industrial automation systems and IoT applications.
 """
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from logging import Logger, getLogger
 from typing import Any
@@ -153,7 +154,7 @@ class RS485Client:
         await self.close()
 
     @asynccontextmanager
-    async def connection(self):
+    async def connection(self) -> AsyncIterator["RS485Client"]:
         """
         Reuse a single connection across multiple operations.
 

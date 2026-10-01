@@ -208,12 +208,46 @@ bytes → ADU → PDU (server framer) → datastore → response PDU → ADU →
 
 ---
 
+## Flow 9 — Modbus/TCP → serial gateway request
+
+**Source**: a standard Modbus/TCP client connecting to `GatewayTcpServer`.
+
+**Path**:
+1. `GatewayTcpServer._handle_connection` reads bytes and buffers them (drop if
+   the buffer exceeds `_MAX_BUFFER`); `_drain_buffer` decodes each complete
+   frame with `FramerSocket` (capturing `dev_id` and the client `tid`).
+2. `_dispatch` decodes the request PDU, then calls
+   `ModbusGateway.handle_request(dev_id, request)`.
+3. `handle_request` resolves the per-device runtime (framer/decoder/translator),
+   or returns an `ExceptionResponse(0x0B)` for unknown devices/bus failures.
+4. `ModbusGateway._forward`, under the bus `asyncio.Lock`, swaps the serial
+   framer if it differs from the current one, then executes the request on the
+   serial bus via `AsyncModbusSerialClient`.
+5. A `GatewayTranslator` (when configured) maps the request to a vendor PDU
+   before the bus, and maps the vendor response back to a standard Modbus
+   response after.
+6. The response PDU is encoded (`FramerSocket.encode`) with the captured `tid`
+   and written back to the TCP client.
+
+**Destination**: the Modbus/TCP client receives a standard Modbus/TCP response.
+
+**Transformations**: Modbus/TCP ADU → request PDU → (vendor PDU → serial ADU →
+vendor response PDU →) response PDU → Modbus/TCP ADU. Device id determines the
+framer/decoder/translator.
+
+**Boundaries**: async TCP server + async serial bus; bus access serialized by a
+single `asyncio.Lock`; framer swapped per device only when it changes.
+
+---
+
 ## Async / process / queue summary
 
 | Boundary | Mechanism | Where |
 | --- | --- | --- |
 | Client I/O | `async`/`await` over pymodbus | `client/rs485_client.py`, `utilities/modbus.py` |
 | Server serving | `asyncio.Task` running `serve_forever` | `server/rs485_server.py` |
+| Gateway TCP serving | `asyncio.start_server` | `gateway/tcp_server.py` |
+| Gateway bus access | `asyncio.Lock` (framer swap + execute) | `gateway/gateway.py` |
 | Virtual worker | `multiprocessing.Process` | `virtual/virtual_serial_network.py` |
 | Parent↔worker control | `multiprocessing.Pipe` (dict messages) | `virtual/virtual_serial_network.py`, `virtual/worker.py` |
 | Worker I/O multiplexing | `selectors.DefaultSelector` (1s timeout) | `virtual/worker.py:forward_data` |

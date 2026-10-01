@@ -1,10 +1,10 @@
 # Design — Modbus Gateway
 
-Status: **agreed, not yet implemented** (target release 2.0.0)
-Last updated: 2026-09-30
+Status: **implemented** (released in 2.0.0)
+Last updated: 2026-10-01
 
 A serial↔TCP Modbus gateway for `scietex.hal.serial`. This document records the
-settled design so implementation can resume without re-deriving it.
+settled design and the verified technical facts behind the implementation.
 
 This document covers **Modbus devices** (RTU/ASCII framing differences only).
 For devices that speak a **non-Modbus vendor protocol**, see the companion
@@ -68,10 +68,10 @@ Confirmed against the installed package; treat as ground truth.
   round-trip: TCP frame → `DecodePDU(True).decode` → PDU object → `client.execute`
   → response PDU → `.encode()` → `FramerSocket.encode` → TCP frame.
 - `AsyncModbusSerialClient.ctx` is a `TransactionManager`; `client.ctx.framer` is
-  a plain attribute read **fresh** on every send (`transaction.py:231`) and
-  receive (`:97`, `:252`) — never cached. Runtime swap is safe. The repo already
-  replaces `client.ctx` wholesale in `modbus_get_client`
-  (`utilities/modbus.py:148-156`).
+  a plain attribute read **fresh** on every send and receive
+  (`TransactionManager.send`/`_recv`/`execute`) — never cached. Runtime swap is
+  safe. The repo already replaces `client.ctx` wholesale in `modbus_get_client`
+  (`utilities/modbus.py`).
 - `client.execute(no_response_expected: bool, request: ModbusPDU)` returns the
   response PDU.
 - `ModbusTcpServer`/`ModbusSerialServer` answer from a datastore and have **no

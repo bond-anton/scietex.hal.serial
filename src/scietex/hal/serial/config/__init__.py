@@ -26,11 +26,11 @@ Raises:
 
 Classes:
     - SerialConnectionMinimalConfig: Concrete implementation of `SerialConnectionMinimalConfigModel`
-      for minimal serial connection configurations.
+        for minimal serial connection configurations.
     - SerialConnectionConfig: Concrete implementation of `SerialConnectionConfigModel` that includes
-      timeout settings.
+        timeout settings.
     - ModbusSerialConnectionConfig: Concrete implementation of `ModbusSerialConnectionConfigModel`
-      with Modbus-specific configuration options.
+        with Modbus-specific configuration options.
 
 Attributes:
     - port (str): The serial port identifier (e.g., "/dev/ttyUSB0" on Linux).

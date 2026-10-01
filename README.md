@@ -1,20 +1,31 @@
 # scietex.hal.serial
+
 **scietex.hal.serial** is a comprehensive serial communication library designed to provide
 a high-level interface for managing serial ports and facilitating communication with serial devices.
-The package is structured into four main modules, each serving a distinct purpose:
+The package is structured into six main modules, each serving a distinct purpose:
 
 - config: Simplifies the creation, storage, and serialization of serial port configurations.
-- virtual: Enables the generation and management of virtual serial networks, ideal for testing 
+- virtual: Enables the generation and management of virtual serial networks, ideal for testing
   environments and overcoming hardware limitations.
 - server: Implements a Modbus server to streamline communication between various
   devices and applications.
 - client: Provides a Modbus client that can be customized to interact with a
   wide range of the equipment.
+- gateway: Bridges a serial RS485 bus to TCP/IP, routing Modbus/TCP requests by device id and
+  supporting non-Modbus vendor protocols through translator plugins.
+- utilities: Checksums, numeric helpers, Modbus helpers, and serial-port discovery.
+
+## Documentation
+
+Full documentation is available at
+**[scietex-hal-serial.readthedocs.io](https://scietex-hal-serial.readthedocs.io/)**,
+covering the user guide, API reference, architecture, and design notes.
 
 ## System Requirements
 
 - **Python**: 3.10 or higher.
-- **Operating Systems**: Compatible with **Linux** and **macOS**.
+- **Operating Systems**: Compatible with **Linux** and **macOS**. The virtual serial layer uses
+  `pty.openpty` and `multiprocessing`, so it does not run on Windows.
 
 ## Installation
 
@@ -153,6 +164,53 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+### Modbus Gateway
+
+The gateway bridges a serial RS485 bus to TCP/IP. It owns one serial port,
+accepts standard Modbus/TCP clients, and routes each request to the right device
+on the bus by device id. Non-Modbus vendor devices are supported through a
+translator plugin.
+
+```python
+import asyncio
+
+from scietex.hal.serial import (
+    GatewayConfig,
+    GatewayDeviceConfig,
+    ModbusGateway,
+    ModbusSerialConnectionConfig,
+)
+
+
+async def main():
+    config = GatewayConfig(
+        serial=ModbusSerialConnectionConfig("/dev/ttyUSB0", baudrate=9600),
+        host="0.0.0.0",
+        port=502,
+        default_framer="RTU",
+        devices={
+            1: GatewayDeviceConfig(device_id=1, framer="RTU"),
+            2: GatewayDeviceConfig(device_id=2, framer="ASCII"),
+        },
+    )
+
+    gateway = ModbusGateway(config)
+    await gateway.start()
+
+    # ... serve until shutdown ...
+
+    await gateway.stop()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+A TCP client then connects to `host:port` and issues normal Modbus/TCP requests
+with the target device id as the unit id. See the
+[Gateway guide](https://scietex-hal-serial.readthedocs.io/en/latest/guide/gateway/)
+for configuration details and the non-standard protocol path.
 
 ### Upgrading to 2.0
 

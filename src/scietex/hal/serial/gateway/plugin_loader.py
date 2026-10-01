@@ -19,7 +19,7 @@ Functions:
     - resolve_decoder: Resolve a decoder reference to a `DecodePDU` subclass.
     - resolve_pdu: Resolve a PDU reference to a `ModbusPDU` subclass.
     - resolve_translator: Resolve a translator reference to a `GatewayTranslator`
-      subclass.
+        subclass.
     - build_framer: Instantiate a framer with a decoder.
 """
 

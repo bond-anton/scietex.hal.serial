@@ -176,23 +176,29 @@ I/O with connect/close and error handling.
 - `modbus_connection_config(con_params) -> dict` — validates type, fills
   `timeout`/`framer` defaults, maps `"RTU"`/`"ASCII"` to `FramerType`, returns
   the 7-key dict.
-- `modbus_get_client(con_params, custom_framer=None, custom_decoder=None, custom_response=None, label=None) -> AsyncModbusSerialClient` — builds client and
-  installs a `TransactionManager` with `retries=3`.
-- `modbus_execute(client, request, no_response_expected=False, logger=None)`
-- `modbus_read_registers(client, start_register=0, count=1, device_id=1, holding=True, max_count=0, logger=None)`
+- `modbus_get_client(con_params, custom_framer=None, custom_decoder=None, custom_response=None, label=None, retries=3) -> AsyncModbusSerialClient` — builds client and
+  installs a `TransactionManager` with the given `retries`.
+- `modbus_connection(client)` — async context manager; connects once, keeps the
+  connection open for the block, and closes it on exit (pair with
+  `manage_connection=False` on the wrappers).
+- `modbus_execute(client, request, no_response_expected=False, logger=None, raise_on_error=True, manage_connection=True)`
+- `modbus_read_registers(client, start_register=0, count=1, device_id=1, holding=True, max_count=0, logger=None, raise_on_error=True, manage_connection=True)`
 - `modbus_read_input_registers(...)`, `modbus_read_holding_registers(...)` —
   wrappers over `modbus_read_registers`.
-- `modbus_write_registers(client, register, value, device_id=1, max_count=0, logger=None, no_response_expected=False)`
-- `modbus_write_register(client, register, value, device_id=1, logger=None, no_response_expected=False)`
+- `modbus_write_registers(client, register, value, device_id=1, max_count=0, logger=None, no_response_expected=False, raise_on_error=True, manage_connection=True)`
+- `modbus_write_register(client, register, value, device_id=1, logger=None, no_response_expected=False, raise_on_error=True, manage_connection=True)`
 
 **Depends on**: `config` (`SerialConnectionMinimalConfigModel`),
 `config.defaults` (`DEFAULT_TIMEOUT`, `DEFAULT_FRAMER`); `pymodbus`.
 
 **Depended on by**: `client`, `server`.
 
-**Notes**: every function calls `client.connect()` and `client.close()` around
-the operation. `modbus_read_registers`/`modbus_write_registers` implement
-chunking via `max_count`.
+**Notes**: each function calls `client.connect()` and `client.close()` around
+the operation unless `manage_connection=False` (use `modbus_connection` for a
+reused connection). `raise_on_error=True` (default) raises
+`ModbusOperationError` on failure; `False` returns `None`.
+`modbus_read_registers`/`modbus_write_registers` implement chunking via
+`max_count`.
 
 ### 5b. `numeric.py`
 
@@ -226,26 +232,87 @@ example uses `lrc`); not imported by `src/` modules.
 **Depends on**: `pyserial` (`serial.tools.list_ports`). **Depended on by**:
 examples only.
 
-### 5e. `mock.py`
+### 5e. `exceptions.py`
 
-**Purpose**: Test double for pty creation failure.
+**Purpose**: Library-level operation exception.
 
-**Main function**: `mock_openpty()` — always raises `OSError`.
+**Main symbol**: `ModbusOperationError` — raised on protocol/transport failures
+(when `raise_on_error=True`).
 
-**Depends on**: nothing. **Depended on by**: tests.
+**Depends on**: nothing. **Depended on by**: `utilities.modbus`, `client`.
 
 ---
 
-## 6. Package root (`__init__.py`)
+## 6. Gateway (`gateway/`)
+
+**Purpose**: Frame-level serial↔TCP Modbus proxy. Owns one serial bus, accepts
+standard Modbus/TCP clients, and routes requests to devices by id, swapping the
+serial framer per device. Non-Modbus vendor protocols are supported through a
+`GatewayTranslator` plugin (dotted-path config).
+
+**Main classes**
+
+- `GatewayConfig` — top-level gateway config: `serial`
+  (`ModbusSerialConnectionConfigModel`), `host`, `port`, `default_framer`,
+  `devices` (`dict[int, GatewayDeviceConfig]`), `allow_unknown_devices`,
+  `bus_retries`. Validates in `__post_init__` and raises `GatewayConfigError`.
+- `GatewayDeviceConfig` — per-device routing entry: `device_id`, `framer`,
+  `decoder`, `pdus`, `translator`. Validates plugin references at construction
+  (fail-fast).
+- `GatewayConfigError(ValueError)` / `GatewayError(Exception)` — config and
+  runtime exceptions.
+- `ModbusGateway` — forwarding core.
+  - `async start()`, `async stop()`
+  - `async handle_request(device_id, request) -> ModbusPDU` — transport-agnostic
+    entry point; maps bus/device failures to a Modbus exception response
+    (0x0B), never raises to the TCP server.
+  - private: `_create_bus`, `_build_runtimes`, `_build_device_runtime`,
+    `_runtime_for`, `_forward`; `asyncio.Lock` serializes bus access.
+- `GatewayTcpServer` — custom asyncio Modbus/TCP front end.
+  - `async start()`, `async stop()`
+  - `_handle_connection` decodes frames with `FramerSocket`, dispatches via
+    `ModbusGateway.handle_request`, and echoes the client transaction id.
+- `GatewayTranslator` (Protocol, `@runtime_checkable`) — plugin contract with
+  `to_vendor(request)` / `to_standard(response)`; pure (no I/O).
+
+**Main functions** (`plugin_loader.py`): `load_class`, `resolve_framer`,
+`resolve_decoder`, `resolve_pdu`, `resolve_translator`, `build_framer`.
+
+**Public interface**: `ModbusGateway`, `GatewayConfig`, `GatewayDeviceConfig`,
+`GatewayTcpServer`, `GatewayTranslator`, `GatewayError`, `GatewayConfigError`
+(package root and `gateway/__init__.py`).
+
+**Depends on**: `config` (`ModbusSerialConnectionConfigModel`); `pymodbus`
+(`AsyncModbusSerialClient`, `FramerType`, `FRAMER_NAME_TO_CLASS`, `FramerBase`,
+`DecodePDU`, `ModbusPDU`, `FramerSocket`, `TransactionManager`,
+`ModbusException`); `asyncio`; stdlib `importlib`.
+
+**Depended on by**: tests and examples only.
+
+**Notes**: `ModbusGateway.handle_request` never raises for bus/device failures —
+it returns an `ExceptionResponse(0x0B)` so the TCP connection stays open. The
+framer is swapped only when the target device's framer differs from the
+currently-installed one.
+
+---
+
+## 7. Package root (`__init__.py`)
 
 **Purpose**: Public API surface.
 
-**Re-exports** (`__all__`): `__version__`, `SerialConnectionMinimalConfig`,
-`SerialConnectionConfig`, `ModbusSerialConnectionConfig`,
-`VirtualSerialNetwork`, `VirtualSerialPair`, `RS485Client`, `RS485Server`,
-`ReactiveSequentialDataBlock`.
+**Re-exports** (`__all__`, 26 symbols): `__version__`,
+`SerialConnectionMinimalConfig`, `SerialConnectionConfig`,
+`ModbusSerialConnectionConfig`, `VirtualSerialNetwork`, `VirtualSerialPair`,
+`RS485Client`, `RS485Server`, `ReactiveSequentialDataBlock`,
+`GatewayConfig`, `GatewayDeviceConfig`, `GatewayConfigError`, `GatewayError`,
+`GatewayTranslator`, `ModbusGateway`, `GatewayTcpServer`,
+`check_sum`, `lrc`, `check_lrc`, `ByteOrder`, `combine_32bit`, `split_32bit`,
+`modbus_get_client`, `modbus_connection`, `find_serial_ports`,
+`ModbusOperationError`.
 
-**Depends on**: `version`, `config`, `virtual`, `client`, `server`.
+**Depends on**: `version`, `config`, `virtual`, `client`, `server`, `gateway`,
+`utilities`.
 
-**Notes**: `utilities` is **not** re-exported at the root; consumers import
-`utilities.*` submodules directly (as examples do).
+**Notes**: `utilities` is re-exported at the root (the stable helpers plus
+`ModbusOperationError`); consumers may also import `utilities.*` submodules
+directly (as examples do).

@@ -33,6 +33,7 @@ focus on higher-level tasks such as retrieving or updating device states.
 """
 
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from pymodbus import FramerType, ModbusException
@@ -161,7 +162,9 @@ def modbus_get_client(
 
 
 @asynccontextmanager
-async def modbus_connection(client: AsyncModbusSerialClient):
+async def modbus_connection(
+    client: AsyncModbusSerialClient,
+) -> AsyncIterator[AsyncModbusSerialClient]:
     """
     Connect once and keep the connection open for the duration of the block.
 
@@ -191,7 +194,7 @@ async def modbus_execute(
     logger: logging.Logger | None = None,
     raise_on_error: bool = True,
     manage_connection: bool = True,
-):
+) -> ModbusPDU | None:
     """
     Executes a Modbus request asynchronously using the provided client and handles the response.
 
