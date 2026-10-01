@@ -146,11 +146,11 @@ class RS485Client:
         self.client.close()
 
     async def __aenter__(self) -> "RS485Client":
-        """Enter the async context manager."""
+        """Return this client on entry to an ``async with`` block."""
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
-        """Exit the async context manager, closing the client."""
+        """Close the underlying client on exit from an ``async with`` block."""
         await self.close()
 
     @asynccontextmanager
@@ -177,7 +177,7 @@ class RS485Client:
     def con_params(
         self,
     ) -> SerialConnectionConfigModel | ModbusSerialConnectionConfigModel:
-        """Connection parameters"""
+        """The serial connection configuration used to build the Modbus client."""
         return self._con_params
 
     @con_params.setter
@@ -185,6 +185,7 @@ class RS485Client:
         self,
         params: SerialConnectionConfigModel | ModbusSerialConnectionConfigModel,
     ) -> None:
+        """Set the connection parameters and rebuild the underlying Modbus client."""
         self._con_params = params
         self.client.close()
         self.client = modbus_get_client(
@@ -197,11 +198,12 @@ class RS485Client:
 
     @property
     def label(self) -> str:
-        """Client label."""
+        """The label used to identify the client in logs."""
         return self._label
 
     @label.setter
     def label(self, new_label: str) -> None:
+        """Set the client label and rebuild the underlying Modbus client."""
         self._label = new_label
         self.client.close()
         self.client = modbus_get_client(
@@ -355,8 +357,8 @@ class RS485Client:
 
         Returns:
             list[int] | None:
-                The written register value as an integer. Returns None if an error occurs or the
-                response is invalid.
+                A list of the written register values. Returns None if `no_response_expected` is
+                True or if the fallback read fails.
         """
         _values = list(values)
         if signed:
@@ -512,8 +514,8 @@ class RS485Client:
 
         Returns:
             float | None:
-                The written float value. Returns None if an error occurs or the response is
-                invalid.
+                The float value scaled from the written register response. Returns None if
+                `no_response_expected` is True or if the fallback read fails.
         """
         response: int | None = await self.write_register(
             register,
@@ -734,8 +736,8 @@ class RS485Client:
 
         Returns:
             float | None:
-                The written float value. Returns None if an error occurs or the response is
-                invalid.
+                The float value scaled from the written two-register response. Returns None if
+                `no_response_expected` is True or if the fallback read fails.
 
         Raises:
             ValueError: If `factor` is zero.

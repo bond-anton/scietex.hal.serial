@@ -6,19 +6,24 @@ physical serial ports. It provides functions to manage a virtual network of seri
 ensuring proper handling of incoming commands and payload exchange between connected ports.
 
 Functions:
-    - generate_virtual_ports(stack, selector, ports_number, master_files, slave_names,
-        worker_io, openpty_func=None):
+    - generate_virtual_ports(stack, selector, ports_number, master_files, master_cache,
+        slave_names, worker_io, openpty_func=None, logger=None):
         Generates a specified number of virtual serial ports using the provided openpty function.
-    - add_external_ports(stack, selector, external_ports, master_files, slave_names, worker_io):
+    - add_external_ports(stack, selector, external_ports, master_files, master_cache,
+        slave_names, worker_io, logger=None):
         Adds external serial ports to the virtual network.
-    - remove_ports(selector, remove_list, master_files, slave_names, worker_io):
+    - remove_ports(selector, remove_list, master_files, master_cache, slave_names, worker_io,
+        logger=None):
         Removes specified ports from the virtual network.
-    - forward_data(selector, master_files, loopback=False):
+    - forward_data(selector, master_files, master_cache, slave_names, loopback=False, logger=None,
+        data_logging_file=None, data_logging_splitter=None):
         Forwards payload between connected ports in the virtual network.
-    - process_cmd(stack, selector, master_files, slave_names, worker_io, openpty_func=None):
+    - process_cmd(stack, selector, master_files, master_cache, slave_names, worker_io,
+        openpty_func=None, logger=None):
         Processes incoming commands from the worker I/O connection.
-    - create_serial_network(worker_io, ports_number=2, external_ports=None,
-        loopback=False, openpty_func=pty.openpty):
+    - create_serial_network(worker_io, ports_number=2, external_ports=None, loopback=False,
+        openpty_func=pty.openpty, logger=None, data_logging_file=None,
+        data_logging_splitter=None):
         Creates a virtual network of serial ports and manages payload flow between them.
 
 Raises:
@@ -80,9 +85,6 @@ def generate_virtual_ports(
         logger (Logger, optional): A logging handler for recording debug, info, warning, and error
             messages related to virtual port generation. Defaults to a basic logger if none
             is provided.
-
-    Raises:
-        SerialConnectionConfigError: If an error occurs during port creation.
     """
     _logger: Logger = logger if isinstance(logger, Logger) else getLogger()
     openpty_func = openpty_func if callable(openpty_func) else pty.openpty
@@ -139,9 +141,6 @@ def add_external_ports(
         logger (Logger, optional): A logging handler for recording debug, info, warning, and error
             messages related to external port addition. Defaults to a basic logger if none
             is provided.
-
-    Raises:
-        SerialConnectionConfigError: If an error occurs during port addition.
     """
     _logger: Logger = logger if isinstance(logger, Logger) else getLogger()
     for con_params in external_ports:
@@ -207,9 +206,6 @@ def remove_ports(
         worker_io (Connection): Worker I/O connection for communicating status updates.
         logger (Logger, optional): A logging handler for recording debug, info, warning, and error
             messages related to port removal. Defaults to a basic logger if none is provided.
-
-    Raises:
-        SerialConnectionConfigError: If an error occurs during port removal.
     """
     _logger: Logger = logger if isinstance(logger, Logger) else getLogger()
     for slave_name in remove_list:
@@ -247,7 +243,23 @@ def setup_data_logging(
     backup_count=5,
     level=logging.DEBUG,
 ) -> Logger:
-    """Sets up a logger for data payload logging with rotation."""
+    """Set up a rotating file logger for data payload logging.
+
+    Creates or reconfigures a logger named `app_name` with a single rotating file handler,
+    clearing any previously attached handlers.
+
+    Args:
+        app_name (str, optional): Logger name. Defaults to "VSN".
+        log_file (str, optional): Path to the log file. Defaults to "vsn-data.log".
+        max_bytes (int, optional): Maximum log file size in bytes before rotation.
+            Defaults to 10 MiB.
+        backup_count (int, optional): Number of rotated files to keep. Defaults to 5.
+        level (int, optional): Logging level applied to the logger and its handler.
+            Defaults to logging.DEBUG.
+
+    Returns:
+        Logger: The configured logger instance.
+    """
     logger = logging.getLogger(app_name)
     logger.setLevel(level)
 
@@ -299,9 +311,6 @@ def forward_data(
             data logging is disabled. Defaults to None.
         data_logging_splitter (bytes, optional): Optional byte sequence to split logged data into
             separate log entries. If None, data is logged as a single entry. Defaults to None.
-
-    Raises:
-        SerialConnectionConfigError: If an error occurs during payload forwarding.
     """
     _logger: Logger = logger if isinstance(logger, Logger) else getLogger()
     data_logger = None
@@ -392,9 +401,6 @@ def process_cmd(
 
     Returns:
         bool: True if the worker should continue running, False otherwise.
-
-    Raises:
-        SerialConnectionConfigError: If an error occurs during command processing.
     """
     if worker_io.poll():
         _logger: Logger = logger if isinstance(logger, Logger) else getLogger()
@@ -483,7 +489,7 @@ def create_serial_network(
             separate log entries. If None, data is logged as a single entry. Defaults to None.
 
     Raises:
-        SerialConnectionConfigError: If an error occurs during network creation.
+        Exception: If an unexpected error occurs during network creation.
     """
     _logger: Logger = logger if isinstance(logger, Logger) else getLogger()
     keep_running: bool = True

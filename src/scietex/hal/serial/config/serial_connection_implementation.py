@@ -129,6 +129,7 @@ class SerialConnectionMinimalConfig(SerialConnectionMinimalConfigModel):
 
     @port.setter
     def port(self, value: str) -> None:
+        """Set the serial port name after validation."""
         self._port = validate_port(value)
 
     @property
@@ -143,6 +144,7 @@ class SerialConnectionMinimalConfig(SerialConnectionMinimalConfigModel):
 
     @baudrate.setter
     def baudrate(self, value: int) -> None:
+        """Set the baudrate after validation."""
         self._baudrate = validate_baudrate(value)
 
     @property
@@ -157,6 +159,7 @@ class SerialConnectionMinimalConfig(SerialConnectionMinimalConfigModel):
 
     @bytesize.setter
     def bytesize(self, value: int) -> None:
+        """Set the bytesize after validation."""
         self._bytesize = validate_bytesize(value)
 
     @property
@@ -171,6 +174,7 @@ class SerialConnectionMinimalConfig(SerialConnectionMinimalConfigModel):
 
     @parity.setter
     def parity(self, value: str) -> None:
+        """Set the parity after validation."""
         self._parity = validate_parity(value)
 
     @property
@@ -179,12 +183,13 @@ class SerialConnectionMinimalConfig(SerialConnectionMinimalConfigModel):
         The serial port stopbits (1 or 2).
 
         Returns:
-            int: The stopbits of the serial port.
+            int | float: The stopbits of the serial port.
         """
         return self._stopbits
 
     @stopbits.setter
     def stopbits(self, value: int | float) -> None:
+        """Set the stopbits after validation."""
         self._stopbits = validate_stopbits(value)
 
     def to_dict(self) -> dict:
@@ -293,13 +298,13 @@ class SerialConnectionConfig(SerialConnectionMinimalConfig, SerialConnectionConf
         The timeout value for the serial connection.
 
         Returns:
-            value (float | None, optional): Timeout value in seconds, or None
-                to disable the timeout.
+            float | None: Timeout value in seconds, or None to disable the timeout.
         """
         return self._timeout
 
     @timeout.setter
     def timeout(self, value: float | None) -> None:
+        """Set the timeout after validation."""
         self._timeout = validate_timeout(value)
 
     @property
@@ -314,6 +319,7 @@ class SerialConnectionConfig(SerialConnectionMinimalConfig, SerialConnectionConf
 
     @write_timeout.setter
     def write_timeout(self, value: float | None) -> None:
+        """Set the write timeout after validation."""
         self._write_timeout = validate_timeout(value)
 
     @property
@@ -328,9 +334,16 @@ class SerialConnectionConfig(SerialConnectionMinimalConfig, SerialConnectionConf
 
     @inter_byte_timeout.setter
     def inter_byte_timeout(self, value: float | None) -> None:
+        """Set the inter-byte timeout after validation."""
         self._inter_byte_timeout = validate_timeout(value)
 
     def to_dict(self) -> dict:
+        """
+        Extend the base dictionary with the timeout settings.
+
+        Returns:
+            dict: A dictionary representation of the serial connection config.
+        """
         return super().to_dict() | {
             "timeout": self.timeout,
             "write_timeout": self.write_timeout,
@@ -429,12 +442,13 @@ class ModbusSerialConnectionConfig(
         The timeout value for the serial connection.
 
         Returns:
-            value (float | None): Timeout value in seconds, or None to disable the timeout.
+            float | None: Timeout value in seconds, or None to disable the timeout.
         """
         return self._timeout
 
     @timeout.setter
     def timeout(self, value: float | None) -> None:
+        """Set the timeout after validation."""
         self._timeout = validate_timeout(value)
 
     @property
@@ -449,9 +463,16 @@ class ModbusSerialConnectionConfig(
 
     @framer.setter
     def framer(self, value: str) -> None:
+        """Set the Modbus framer type after validation."""
         self._framer = validate_framer(value)
 
     def to_dict(self) -> dict:
+        """
+        Extend the base dictionary with the framer and timeout settings.
+
+        Returns:
+            dict: A dictionary representation of the Modbus serial connection config.
+        """
         return super().to_dict() | {"framer": self.framer, "timeout": self.timeout}
 
     def __str__(self) -> str:
