@@ -61,6 +61,7 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Changelog: changelog.md
   - User Guide:
       - Configuration: guide/configuration.md
       - Virtual Serial Network: guide/virtual.md

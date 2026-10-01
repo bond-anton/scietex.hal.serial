@@ -21,6 +21,8 @@ Full documentation is available at
 **[scietex-hal-serial.readthedocs.io](https://scietex-hal-serial.readthedocs.io/)**,
 covering the user guide, API reference, architecture, and design notes.
 
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
 ## System Requirements
 
 - **Python**: 3.10 or higher.
