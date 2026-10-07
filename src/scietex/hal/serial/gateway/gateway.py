@@ -88,13 +88,23 @@ class ModbusGateway:
         Open the serial bus and build per-device runtime state.
 
         Idempotent: a second call while running has no effect.
+
+        A failed initial connect does not abort startup: the async client
+        reconnects on the next request, so the gateway stays up and recovers
+        once the port is available. The failure is logged as a warning so a
+        dead bus is not reported as a healthy start.
         """
         if self._bus is not None:
             return
         self._build_runtimes()
         self._bus = self._create_bus()
-        await self._bus.connect()
-        self.logger.info("Gateway bus opened on %s", self.config.serial.port)
+        if await self._bus.connect():
+            self.logger.info("Gateway bus opened on %s", self.config.serial.port)
+        else:
+            self.logger.warning(
+                "Gateway bus could not be opened on %s; will retry on the next request",
+                self.config.serial.port,
+            )
 
     async def stop(self) -> None:
         """Close the serial bus. Idempotent."""

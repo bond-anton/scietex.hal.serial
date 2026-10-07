@@ -11,11 +11,17 @@ from pymodbus.pdu.register_message import (
 
 try:
     from src.scietex.hal.serial.config import ModbusSerialConnectionConfig
-    from src.scietex.hal.serial.gateway.config import GatewayConfig
+    from src.scietex.hal.serial.gateway.config import (
+        GatewayConfig,
+        GatewayDeviceConfig,
+    )
     from src.scietex.hal.serial.gateway.gateway import ModbusGateway
 except ModuleNotFoundError:
     from scietex.hal.serial.config import ModbusSerialConnectionConfig
-    from scietex.hal.serial.gateway.config import GatewayConfig
+    from scietex.hal.serial.gateway.config import (
+        GatewayConfig,
+        GatewayDeviceConfig,
+    )
     from scietex.hal.serial.gateway.gateway import ModbusGateway
 
 
@@ -103,6 +109,25 @@ async def test_stop_is_idempotent(gateway):
     await gateway.stop()
     await gateway.stop()
     assert gateway._bus is None
+
+
+@pytest.mark.asyncio
+async def test_start_warns_when_bus_cannot_open(logger_fixture, caplog):
+    """A missing serial port logs a warning instead of a healthy start."""
+    serial = ModbusSerialConnectionConfig("/dev/does-not-exist-xyz", timeout=0.2)
+    config = GatewayConfig(
+        serial=serial,
+        devices={1: GatewayDeviceConfig(device_id=1, framer="RTU")},
+    )
+    gw = ModbusGateway(config, logger=logger_fixture)
+    with caplog.at_level("WARNING"):
+        await gw.start()
+    try:
+        assert gw._bus is not None
+        assert any("could not be opened" in record.message for record in caplog.records)
+        assert not any("Gateway bus opened" in record.message for record in caplog.records)
+    finally:
+        await gw.stop()
 
 
 @pytest.mark.asyncio
