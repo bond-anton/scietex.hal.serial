@@ -222,6 +222,149 @@ async def test_port_gone_after_start_maps_to_exception(gateway, bus_server):
 
 
 @pytest.mark.asyncio
+async def test_port_gone_then_returns_recovers(
+    vsp_fixture, single_slave_fixture, logger_fixture, caplog
+):
+    """A port lost after a healthy start recovers once it returns.
+
+    The bus failure is logged, and the next request after the port is back
+    reconnects and succeeds.
+    """
+    serial = ModbusSerialConnectionConfig(vsp_fixture.serial_ports[0], timeout=0.5)
+    bus_server = RS485Server(serial, devices=single_slave_fixture, logger=logger_fixture)
+    await bus_server.start()
+
+    gateway_config = GatewayConfig(
+        serial=ModbusSerialConnectionConfig(vsp_fixture.serial_ports[1], timeout=0.5),
+        devices={1: GatewayDeviceConfig(device_id=1, framer="RTU")},
+    )
+    gw = ModbusGateway(gateway_config, logger=logger_fixture)
+    await gw.start()
+    try:
+        request = ReadHoldingRegistersRequest(address=0, count=2, dev_id=1)
+        healthy = await gw.handle_request(1, request)
+        assert isinstance(healthy, ReadHoldingRegistersResponse)
+
+        # The bus disappears: the request fails and the failure is logged.
+        await bus_server.stop()
+        with caplog.at_level("ERROR"):
+            gone = await gw.handle_request(
+                1, ReadHoldingRegistersRequest(address=0, count=2, dev_id=1)
+            )
+        assert isinstance(gone, ExceptionResponse)
+        assert gone.exception_code == 0x0B
+        assert any("Bus failure for device 1" in record.getMessage() for record in caplog.records)
+
+        # The bus returns: the next request reconnects and succeeds.
+        bus_server = RS485Server(serial, devices=single_slave_fixture, logger=logger_fixture)
+        await bus_server.start()
+        back = await gw.handle_request(1, ReadHoldingRegistersRequest(address=0, count=2, dev_id=1))
+        assert isinstance(back, ReadHoldingRegistersResponse)
+        assert back.registers == [1, 2]
+    finally:
+        await gw.stop()
+        await bus_server.stop()
+
+
+@pytest.mark.asyncio
+async def test_permission_denied_at_start_recovers_when_restored(
+    vsp_fixture, single_slave_fixture, logger_fixture, caplog
+):
+    """A port that cannot be opened for lack of permission recovers once fixed.
+
+    The initial connect fails with EACCES, startup logs the warning, and the
+    next request after the permissions are restored reconnects and succeeds.
+    """
+    serial = ModbusSerialConnectionConfig(vsp_fixture.serial_ports[0], timeout=0.5)
+    bus_server = RS485Server(serial, devices=single_slave_fixture, logger=logger_fixture)
+    await bus_server.start()
+
+    gateway_port = vsp_fixture.serial_ports[1]
+    os.chmod(gateway_port, 0o000)
+    gateway_config = GatewayConfig(
+        serial=ModbusSerialConnectionConfig(gateway_port, timeout=0.5),
+        devices={1: GatewayDeviceConfig(device_id=1, framer="RTU")},
+    )
+    gw = ModbusGateway(gateway_config, logger=logger_fixture)
+    try:
+        with caplog.at_level("WARNING"):
+            await gw.start()
+        assert any(
+            record.levelname == "WARNING" and "could not be opened" in record.getMessage()
+            for record in caplog.records
+        )
+
+        denied = await gw.handle_request(
+            1, ReadHoldingRegistersRequest(address=0, count=2, dev_id=1)
+        )
+        assert isinstance(denied, ExceptionResponse)
+        assert denied.exception_code == 0x0B
+
+        os.chmod(gateway_port, 0o600)
+        restored = await gw.handle_request(
+            1, ReadHoldingRegistersRequest(address=0, count=2, dev_id=1)
+        )
+        assert isinstance(restored, ReadHoldingRegistersResponse)
+        assert restored.registers == [1, 2]
+    finally:
+        os.chmod(gateway_port, 0o600)
+        await gw.stop()
+        await bus_server.stop()
+
+
+@pytest.mark.asyncio
+async def test_permission_lost_after_connect_recovers_when_restored(
+    vsp_fixture, single_slave_fixture, logger_fixture, caplog
+):
+    """Permissions lost after a healthy connect recover once restored.
+
+    The transport drops (the bus disappears) while the port is unreadable, so
+    the reconnect fails with EACCES and the request yields 0x0B. Restoring the
+    permissions and the bus lets the next request reconnect and succeed.
+    """
+    serial = ModbusSerialConnectionConfig(vsp_fixture.serial_ports[0], timeout=0.5)
+    bus_server = RS485Server(serial, devices=single_slave_fixture, logger=logger_fixture)
+    await bus_server.start()
+
+    gateway_port = vsp_fixture.serial_ports[1]
+    gateway_config = GatewayConfig(
+        serial=ModbusSerialConnectionConfig(gateway_port, timeout=0.5),
+        devices={1: GatewayDeviceConfig(device_id=1, framer="RTU")},
+    )
+    gw = ModbusGateway(gateway_config, logger=logger_fixture)
+    await gw.start()
+    try:
+        request = ReadHoldingRegistersRequest(address=0, count=2, dev_id=1)
+        healthy = await gw.handle_request(1, request)
+        assert isinstance(healthy, ReadHoldingRegistersResponse)
+
+        # The bus drops and the port becomes unreadable: the reconnect fails.
+        await bus_server.stop()
+        os.chmod(gateway_port, 0o000)
+        with caplog.at_level("ERROR"):
+            denied = await gw.handle_request(
+                1, ReadHoldingRegistersRequest(address=0, count=2, dev_id=1)
+            )
+        assert isinstance(denied, ExceptionResponse)
+        assert denied.exception_code == 0x0B
+        assert any("Bus failure for device 1" in record.getMessage() for record in caplog.records)
+
+        # Permissions and the bus return: the next request reconnects.
+        os.chmod(gateway_port, 0o600)
+        bus_server = RS485Server(serial, devices=single_slave_fixture, logger=logger_fixture)
+        await bus_server.start()
+        restored = await gw.handle_request(
+            1, ReadHoldingRegistersRequest(address=0, count=2, dev_id=1)
+        )
+        assert isinstance(restored, ReadHoldingRegistersResponse)
+        assert restored.registers == [1, 2]
+    finally:
+        os.chmod(gateway_port, 0o600)
+        await gw.stop()
+        await bus_server.stop()
+
+
+@pytest.mark.asyncio
 async def test_smart_swap_same_framer_no_swap(gateway, bus_server):
     """Two requests to the same device do not swap the framer twice."""
     await bus_server.start()

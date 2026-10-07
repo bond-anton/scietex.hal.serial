@@ -16,7 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recovered: the pymodbus client's `execute` raises `ConnectionException` when
   the transport is missing instead of reconnecting, so every request returned
   exception `0x0B` even after the port became available. The gateway now calls
-  `connect()` itself before forwarding (`_ensure_connected`).
+  `connect()` itself before forwarding (`_ensure_connected`). This covers a port
+  that is absent at startup, a port that disappears after a healthy start, and a
+  port that cannot be opened for lack of permission (`EACCES`) — in every case
+  the next request after the port is usable reconnects and succeeds.
 
 ## [2.0.1] - 2026-10-07
 

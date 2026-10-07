@@ -122,6 +122,11 @@ The same applies to a port that disappears after a healthy start: the next
 request fails with exception `0x0B` and the gateway reconnects once the port
 returns. The gateway itself never goes down.
 
+A port that cannot be opened for lack of permission (`EACCES`, for example a
+device owned by another user) behaves the same way: startup logs the warning,
+requests fail with `0x0B`, and the gateway reconnects once the permissions are
+restored.
+
 ## See also
 
 - [Gateway API reference](../api/gateway.md)
