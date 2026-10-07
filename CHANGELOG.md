@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-10-07
+
+### Fixed
+
+- `ModbusGateway` now reconnects the serial bus on the next request when the
+  transport is down. Previously a gateway whose initial connect failed never
+  recovered: the pymodbus client's `execute` raises `ConnectionException` when
+  the transport is missing instead of reconnecting, so every request returned
+  exception `0x0B` even after the port became available. The gateway now calls
+  `connect()` itself before forwarding (`_ensure_connected`).
+
 ## [2.0.1] - 2026-10-07
 
 ### Fixed
@@ -14,8 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ModbusGateway.start()` no longer reports a healthy start when the serial port
   cannot be opened. It now checks the connect result and logs a warning
   (`Gateway bus could not be opened on <port>; will retry on the next request`)
-  instead of `Gateway bus opened on <port>`. Startup still succeeds — the client
-  reconnects on the next request.
+  instead of `Gateway bus opened on <port>`. Startup still succeeds; the gateway
+  reconnects on the next request (see the `[Unreleased]` fix).
 
 ## [2.0.0] - 2026-10-01
 

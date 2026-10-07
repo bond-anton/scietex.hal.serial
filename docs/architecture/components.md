@@ -293,8 +293,10 @@ serial framer per device. Non-Modbus vendor protocols are supported through a
 it returns an `ExceptionResponse(0x0B)` so the TCP connection stays open. The
 framer is swapped only when the target device's framer differs from the
 currently-installed one. `start()` also tolerates a missing serial port: a
-failed initial connect logs a warning and the client reconnects on the next
-request, so the gateway stays up and recovers once the port is available.
+failed initial connect logs a warning and the gateway reconnects on the next
+request (`_ensure_connected`), so it stays up and recovers once the port is
+available. A port lost after startup behaves the same way — the next request
+returns 0x0B and the gateway reconnects when the port returns.
 
 ---
 

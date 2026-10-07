@@ -89,10 +89,10 @@ class ModbusGateway:
 
         Idempotent: a second call while running has no effect.
 
-        A failed initial connect does not abort startup: the async client
-        reconnects on the next request, so the gateway stays up and recovers
-        once the port is available. The failure is logged as a warning so a
-        dead bus is not reported as a healthy start.
+        A failed initial connect does not abort startup: the gateway reconnects
+        on the next request (see `_ensure_connected`), so it stays up and
+        recovers once the port is available. The failure is logged as a warning
+        so a dead bus is not reported as a healthy start.
         """
         if self._bus is not None:
             return
@@ -220,6 +220,23 @@ class ModbusGateway:
             self.logger.error("Bus failure for device %s: %s", device_id, exc)
             return ExceptionResponse(request.function_code, _GATEWAY_TARGET_FAILED)
 
+    async def _ensure_connected(self) -> None:
+        """
+        Reconnect the bus if the transport is down.
+
+        The client's ``execute`` raises ``ConnectionException`` when the
+        transport is missing instead of reconnecting, so a gateway whose initial
+        connect failed would never recover. Reconnecting here makes the
+        documented "retry on the next request" behavior real.
+
+        Raises:
+            GatewayError: If the bus is not started or the reconnect fails.
+        """
+        if self._bus is None:
+            raise GatewayError("Gateway bus is not started")
+        if self._bus.ctx.transport is None and not await self._bus.connect():
+            raise GatewayError(f"Gateway bus could not be opened on {self.config.serial.port}")
+
     async def _forward(
         self, device_id: int, request: ModbusPDU, runtime: _DeviceRuntime
     ) -> ModbusPDU:
@@ -233,6 +250,7 @@ class ModbusGateway:
         vendor_request.dev_id = device_id
 
         async with self._lock:
+            await self._ensure_connected()
             if self._current_framer is not runtime.framer:
                 self._bus.ctx.framer = runtime.framer
                 self._current_framer = runtime.framer

@@ -111,12 +111,16 @@ stays open, so the client can retry. `handle_request` never raises.
 ### Missing serial port
 
 `start()` does not fail when the serial port cannot be opened (for example, a
-USB converter that is unplugged). The async client reconnects on the next
-request, so the gateway stays up and recovers automatically once the port is
-available. A failed initial connect is logged as a warning
+USB converter that is unplugged). The gateway reconnects on the next request, so
+it stays up and recovers automatically once the port is available. A failed
+initial connect is logged as a warning
 (`Gateway bus could not be opened on <port>; will retry on the next request`)
 instead of the usual `Gateway bus opened on <port>` info line, so a dead bus is
 not reported as a healthy start.
+
+The same applies to a port that disappears after a healthy start: the next
+request fails with exception `0x0B` and the gateway reconnects once the port
+returns. The gateway itself never goes down.
 
 ## See also
 

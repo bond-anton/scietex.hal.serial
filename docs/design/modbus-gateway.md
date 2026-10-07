@@ -36,7 +36,8 @@ selecting framer/decoder/PDU per device from configuration.
 | Concurrency | One `asyncio.Lock` around swap+execute (the bus is one physical line) |
 | Unknown device id | `allow_unknown_devices` flag; default `False` → reject with exception 0x0B |
 | Bus failure | Modbus exception response (0x0B), TCP connection stays open |
-| Missing port at startup | `start()` succeeds; a failed initial connect logs a warning and the client reconnects on the next request |
+| Missing port at startup | `start()` succeeds; a failed initial connect logs a warning and the gateway reconnects on the next request (`_ensure_connected`) |
+| Port lost after startup | Next request returns 0x0B; the gateway reconnects once the port returns |
 
 ## Architecture
 
