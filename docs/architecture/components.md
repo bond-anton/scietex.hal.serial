@@ -292,7 +292,9 @@ serial framer per device. Non-Modbus vendor protocols are supported through a
 **Notes**: `ModbusGateway.handle_request` never raises for bus/device failures —
 it returns an `ExceptionResponse(0x0B)` so the TCP connection stays open. The
 framer is swapped only when the target device's framer differs from the
-currently-installed one.
+currently-installed one. `start()` also tolerates a missing serial port: a
+failed initial connect logs a warning and the client reconnects on the next
+request, so the gateway stays up and recovers once the port is available.
 
 ---
 

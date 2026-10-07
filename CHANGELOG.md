@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `ModbusGateway.start()` no longer reports a healthy start when the serial port
+  cannot be opened. It now checks the connect result and logs a warning
+  (`Gateway bus could not be opened on <port>; will retry on the next request`)
+  instead of `Gateway bus opened on <port>`. Startup still succeeds — the client
+  reconnects on the next request.
+
 ## [2.0.0] - 2026-10-01
 
 ### Added

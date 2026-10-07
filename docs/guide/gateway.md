@@ -108,6 +108,16 @@ A bus or device failure is returned to the TCP client as a Modbus exception
 response (code `0x0B`, gateway target failed to respond). The TCP connection
 stays open, so the client can retry. `handle_request` never raises.
 
+### Missing serial port
+
+`start()` does not fail when the serial port cannot be opened (for example, a
+USB converter that is unplugged). The async client reconnects on the next
+request, so the gateway stays up and recovers automatically once the port is
+available. A failed initial connect is logged as a warning
+(`Gateway bus could not be opened on <port>; will retry on the next request`)
+instead of the usual `Gateway bus opened on <port>` info line, so a dead bus is
+not reported as a healthy start.
+
 ## See also
 
 - [Gateway API reference](../api/gateway.md)

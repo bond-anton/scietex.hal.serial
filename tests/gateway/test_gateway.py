@@ -123,11 +123,34 @@ async def test_start_warns_when_bus_cannot_open(logger_fixture, caplog):
     with caplog.at_level("WARNING"):
         await gw.start()
     try:
+        # Startup still succeeds: the client reconnects on the next request.
         assert gw._bus is not None
-        assert any("could not be opened" in record.message for record in caplog.records)
-        assert not any("Gateway bus opened" in record.message for record in caplog.records)
+        warnings = [
+            record
+            for record in caplog.records
+            if record.levelname == "WARNING" and "could not be opened" in record.getMessage()
+        ]
+        assert warnings
+        assert not any("Gateway bus opened" in record.getMessage() for record in caplog.records)
     finally:
         await gw.stop()
+
+
+@pytest.mark.asyncio
+async def test_start_logs_opened_when_bus_connects(gateway, bus_server, caplog):
+    """A reachable serial port logs the healthy-start message, not a warning."""
+    await bus_server.start()
+    with caplog.at_level("INFO"):
+        await gateway.start()
+    try:
+        assert any(
+            record.levelname == "INFO" and "Gateway bus opened" in record.getMessage()
+            for record in caplog.records
+        )
+        assert not any("could not be opened" in record.getMessage() for record in caplog.records)
+    finally:
+        await gateway.stop()
+        await bus_server.stop()
 
 
 @pytest.mark.asyncio
