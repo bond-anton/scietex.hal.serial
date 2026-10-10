@@ -28,6 +28,7 @@ from pymodbus.transaction import TransactionManager
 
 from .config import GatewayConfig, GatewayDeviceConfig
 from .exceptions import GatewayError
+from .metrics import GatewayMetrics
 from .plugin_loader import (
     build_framer,
     resolve_decoder,
@@ -80,6 +81,24 @@ class ModbusGateway:
         self._current_framer: FramerBase | None = None
         self._devices: dict[int, _DeviceRuntime] = {}
         self._default_runtime: _DeviceRuntime | None = None
+        self._metrics = GatewayMetrics()
+
+    # -- telemetry ---------------------------------------------------------
+
+    @property
+    def metrics(self) -> GatewayMetrics:
+        """The live telemetry counters for this gateway."""
+        return self._metrics
+
+    @property
+    def serial_connected(self) -> bool:
+        """Whether the serial transport is currently open."""
+        return self._bus is not None and self._bus.ctx.transport is not None
+
+    @property
+    def serial_port(self) -> str:
+        """The configured serial device path."""
+        return self.config.serial.port
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -212,12 +231,17 @@ class ModbusGateway:
             runtime = self._runtime_for(device_id)
         except GatewayError as exc:
             self.logger.warning("%s", exc)
+            self._metrics.record_request(device_id)
+            self._metrics.record_error(device_id)
             return ExceptionResponse(request.function_code, _GATEWAY_TARGET_FAILED)
 
+        self._metrics.record_request(device_id)
+        self._metrics.touch(device_id)
         try:
             return await self._forward(device_id, request, runtime)
         except (ModbusException, GatewayError, asyncio.TimeoutError) as exc:
             self.logger.error("Bus failure for device %s: %s", device_id, exc)
+            self._metrics.record_error(device_id)
             return ExceptionResponse(request.function_code, _GATEWAY_TARGET_FAILED)
 
     async def _ensure_connected(self) -> None:
@@ -256,6 +280,7 @@ class ModbusGateway:
                 self._current_framer = runtime.framer
             vendor_response = await self._bus.execute(False, vendor_request)
 
+        self._metrics.record_retries(device_id, getattr(vendor_response, "retries", 0))
         if runtime.translator is not None:
             return runtime.translator.to_standard(vendor_response)
         return vendor_response

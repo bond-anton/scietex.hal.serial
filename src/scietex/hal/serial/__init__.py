@@ -7,10 +7,12 @@ from .config import (
     SerialConnectionMinimalConfig,
 )
 from .gateway import (
+    DeviceCounters,
     GatewayConfig,
     GatewayConfigError,
     GatewayDeviceConfig,
     GatewayError,
+    GatewayMetrics,
     GatewayTcpServer,
     GatewayTranslator,
     ModbusGateway,
@@ -46,6 +48,8 @@ __all__ = [
     "GatewayConfigError",
     "GatewayError",
     "GatewayTranslator",
+    "GatewayMetrics",
+    "DeviceCounters",
     "ModbusGateway",
     "GatewayTcpServer",
     "check_sum",

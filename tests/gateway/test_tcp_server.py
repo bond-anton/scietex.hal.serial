@@ -101,3 +101,41 @@ async def test_server_start_stop_idempotent(gateway_stack):
     await server.stop()
     await server.stop()
     await gateway.stop()
+
+
+@pytest.mark.asyncio
+async def test_server_telemetry_accessors(gateway_stack):
+    """tcp_listening/host/port reflect the listener state and config."""
+    gateway, server, port = gateway_stack
+    assert server.tcp_listening is False
+    assert server.tcp_host == "127.0.0.1"
+    assert server.tcp_port == port
+    await gateway.start()
+    await server.start()
+    try:
+        assert server.tcp_listening is True
+    finally:
+        await server.stop()
+        await gateway.stop()
+    assert server.tcp_listening is False
+
+
+@pytest.mark.asyncio
+async def test_server_client_count_tracks_connections(bus_server, gateway_stack):
+    """client_count rises while a client is connected and drops on close."""
+    gateway, server, port = gateway_stack
+    await bus_server.start()
+    await gateway.start()
+    await server.start()
+    client = AsyncModbusTcpClient("127.0.0.1", port=port, timeout=1)
+    try:
+        assert server.client_count == 0
+        await client.connect()
+        response = await client.read_holding_registers(address=0, count=1, device_id=1)
+        assert not response.isError()
+        assert server.client_count == 1
+    finally:
+        client.close()
+        await server.stop()
+        await gateway.stop()
+        await bus_server.stop()

@@ -13,6 +13,7 @@ See ``docs/design/modbus-gateway.md`` and
 from .config import GatewayConfig, GatewayDeviceConfig
 from .exceptions import GatewayConfigError, GatewayError
 from .gateway import ModbusGateway
+from .metrics import DeviceCounters, GatewayMetrics
 from .plugin_loader import (
     build_framer,
     load_class,
@@ -29,8 +30,10 @@ __all__ = [
     "GatewayConfigError",
     "GatewayDeviceConfig",
     "GatewayError",
+    "GatewayMetrics",
     "GatewayTcpServer",
     "GatewayTranslator",
+    "DeviceCounters",
     "ModbusGateway",
     "build_framer",
     "load_class",

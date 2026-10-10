@@ -56,7 +56,30 @@ class GatewayTcpServer:
         self.gateway = gateway
         self.logger = logger if logger is not None else getLogger(__name__)
         self._server: asyncio.AbstractServer | None = None
+        self._client_count = 0
         self._request_pdus: list[type[ModbusPDU]] = self._collect_request_pdus()
+
+    # -- telemetry ---------------------------------------------------------
+
+    @property
+    def client_count(self) -> int:
+        """Number of currently connected TCP clients."""
+        return self._client_count
+
+    @property
+    def tcp_listening(self) -> bool:
+        """Whether the TCP listener is currently bound."""
+        return self._server is not None
+
+    @property
+    def tcp_host(self) -> str:
+        """The configured TCP bind address."""
+        return self.config.host
+
+    @property
+    def tcp_port(self) -> int:
+        """The configured TCP bind port."""
+        return self.config.port
 
     def _collect_request_pdus(self) -> list[type[ModbusPDU]]:
         """Union of custom request PDU classes declared across all devices."""
@@ -100,6 +123,7 @@ class GatewayTcpServer:
             decoder.register(pdu_cls)
         framer = FramerSocket(decoder)
         buffer = b""
+        self._client_count += 1
         try:
             while chunk := await reader.read(_READ_SIZE):
                 buffer += chunk
@@ -110,6 +134,7 @@ class GatewayTcpServer:
         except (ConnectionError, asyncio.IncompleteReadError):
             self.logger.debug("TCP client disconnected")
         finally:
+            self._client_count -= 1
             writer.close()
             try:
                 await writer.wait_closed()
