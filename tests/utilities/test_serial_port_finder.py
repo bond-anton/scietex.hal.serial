@@ -5,15 +5,19 @@ from unittest.mock import patch
 
 try:
     from src.scietex.hal.serial.utilities.serial_port_finder import (
+        SerialPortInfo,
         find_rs485,
         find_serial_ports,
         find_stm32_cdc,
+        list_serial_ports,
     )
 except ModuleNotFoundError:
     from scietex.hal.serial.utilities.serial_port_finder import (
+        SerialPortInfo,
         find_rs485,
         find_serial_ports,
         find_stm32_cdc,
+        list_serial_ports,
     )
 
 
@@ -61,3 +65,31 @@ def test_find_stm32_cdc_override_mapping():
     with patch("serial.tools.list_ports.comports", return_value=ports):
         result = find_stm32_cdc(mapping={0x1234: [0x5678]})
     assert result == ["/dev/ttyCUSTOM"]
+
+
+def test_list_serial_ports_returns_all_unfiltered():
+    ports = _comports(
+        SimpleNamespace(device="/dev/ttyACM0", description="STM32 CDC"),
+        SimpleNamespace(device="/dev/ttyUSB0", description="USB Serial"),
+        SimpleNamespace(device="/dev/ttyS0", description="ttyS0"),
+    )
+    with patch("serial.tools.list_ports.comports", return_value=ports):
+        result = list_serial_ports()
+    assert result == [
+        SerialPortInfo(device="/dev/ttyACM0", description="STM32 CDC"),
+        SerialPortInfo(device="/dev/ttyUSB0", description="USB Serial"),
+        SerialPortInfo(device="/dev/ttyS0", description="ttyS0"),
+    ]
+
+
+def test_list_serial_ports_coerces_none_description():
+    ports = _comports(SimpleNamespace(device="/dev/ttyS0", description=None))
+    with patch("serial.tools.list_ports.comports", return_value=ports):
+        result = list_serial_ports()
+    assert result == [SerialPortInfo(device="/dev/ttyS0", description="")]
+
+
+def test_list_serial_ports_empty():
+    with patch("serial.tools.list_ports.comports", return_value=[]):
+        result = list_serial_ports()
+    assert result == []

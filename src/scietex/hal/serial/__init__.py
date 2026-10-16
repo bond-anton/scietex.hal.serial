@@ -21,10 +21,12 @@ from .server import ReactiveSequentialDataBlock, RS485Server
 from .utilities import (
     ByteOrder,
     ModbusOperationError,
+    SerialPortInfo,
     check_lrc,
     check_sum,
     combine_32bit,
     find_serial_ports,
+    list_serial_ports,
     lrc,
     modbus_connection,
     modbus_get_client,
@@ -61,5 +63,7 @@ __all__ = [
     "modbus_get_client",
     "modbus_connection",
     "find_serial_ports",
+    "list_serial_ports",
+    "SerialPortInfo",
     "ModbusOperationError",
 ]

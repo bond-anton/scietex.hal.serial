@@ -34,9 +34,11 @@ from .numeric import (
 )
 from .serial_port_finder import (
     DEVICE_PROFILES,
+    SerialPortInfo,
     find_rs485,
     find_serial_ports,
     find_stm32_cdc,
+    list_serial_ports,
 )
 
 __all__ = [
@@ -65,7 +67,9 @@ __all__ = [
     "modbus_write_registers",
     "modbus_write_register",
     "DEVICE_PROFILES",
+    "SerialPortInfo",
     "find_serial_ports",
     "find_stm32_cdc",
     "find_rs485",
+    "list_serial_ports",
 ]

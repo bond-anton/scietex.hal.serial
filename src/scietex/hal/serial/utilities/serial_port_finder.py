@@ -5,6 +5,8 @@ mapping profile names to VID/PID maps. Pass a custom mapping to the
 convenience helpers to override the built-in profiles.
 """
 
+from dataclasses import dataclass
+
 import serial.tools.list_ports
 
 #: Registry of hardware profiles mapping profile names to VID/PID maps.
@@ -23,6 +25,35 @@ STM_CDC_DEVICES = DEVICE_PROFILES["stm32_cdc"]
 
 #: VID/PID mapping for RS485 USB converters.
 RS485_DEVICES = DEVICE_PROFILES["rs485"]
+
+
+@dataclass(frozen=True, slots=True)
+class SerialPortInfo:
+    """A serial port as reported by pyserial, unfiltered by VID/PID.
+
+    Args:
+        device: Device path (e.g. ``/dev/ttyUSB0``).
+        description: Human-readable description; empty when pyserial reports
+            none.
+    """
+
+    device: str
+    description: str = ""
+
+
+def list_serial_ports() -> list[SerialPortInfo]:
+    """List every system serial port with its device path and description.
+
+    Unlike :func:`find_serial_ports`, this applies no VID/PID filter, so it
+    returns all ports the host exposes.
+
+    Returns:
+        list[SerialPortInfo]: One entry per detected port, in pyserial order.
+    """
+    return [
+        SerialPortInfo(device=port.device, description=port.description or "")
+        for port in serial.tools.list_ports.comports()
+    ]
 
 
 def find_serial_ports(vid_pid_mapping: dict[int, list[int]]) -> list[str]:
