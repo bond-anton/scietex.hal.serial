@@ -11,6 +11,13 @@ See ``docs/design/modbus-gateway.md`` and
 """
 
 from .config import GatewayConfig, GatewayDeviceConfig
+from .drivers import (
+    ENTRY_POINT_GROUP,
+    ModbusDriver,
+    discover_drivers,
+    resolve_driver,
+    verify_driver,
+)
 from .exceptions import GatewayConfigError, GatewayError
 from .gateway import ModbusGateway
 from .metrics import DeviceCounters, GatewayMetrics
@@ -26,6 +33,7 @@ from .tcp_server import GatewayTcpServer
 from .translator import GatewayTranslator
 
 __all__ = [
+    "ENTRY_POINT_GROUP",
     "GatewayConfig",
     "GatewayConfigError",
     "GatewayDeviceConfig",
@@ -34,11 +42,15 @@ __all__ = [
     "GatewayTcpServer",
     "GatewayTranslator",
     "DeviceCounters",
+    "ModbusDriver",
     "ModbusGateway",
     "build_framer",
+    "discover_drivers",
     "load_class",
     "resolve_decoder",
+    "resolve_driver",
     "resolve_framer",
     "resolve_pdu",
     "resolve_translator",
+    "verify_driver",
 ]

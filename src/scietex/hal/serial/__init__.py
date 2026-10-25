@@ -7,6 +7,7 @@ from .config import (
     SerialConnectionMinimalConfig,
 )
 from .gateway import (
+    ENTRY_POINT_GROUP,
     DeviceCounters,
     GatewayConfig,
     GatewayConfigError,
@@ -15,7 +16,11 @@ from .gateway import (
     GatewayMetrics,
     GatewayTcpServer,
     GatewayTranslator,
+    ModbusDriver,
     ModbusGateway,
+    discover_drivers,
+    resolve_driver,
+    verify_driver,
 )
 from .server import ReactiveSequentialDataBlock, RS485Server
 from .utilities import (
@@ -52,8 +57,13 @@ __all__ = [
     "GatewayTranslator",
     "GatewayMetrics",
     "DeviceCounters",
+    "ModbusDriver",
     "ModbusGateway",
     "GatewayTcpServer",
+    "ENTRY_POINT_GROUP",
+    "discover_drivers",
+    "resolve_driver",
+    "verify_driver",
     "check_sum",
     "lrc",
     "check_lrc",
