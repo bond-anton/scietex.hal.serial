@@ -70,6 +70,15 @@ def test_discover_drivers_rejects_a_non_descriptor():
         discover_drivers(entries)
 
 
+def test_discover_drivers_skips_an_entry_point_that_fails_to_load():
+    entries = [
+        _entry_point("broken", "tests.gateway.vendor_stub.drivers:missing_attribute"),
+        _entry_point("alpha", "tests.gateway.vendor_stub.drivers:alpha_driver"),
+    ]
+    discovered = discover_drivers(entries)
+    assert list(discovered) == ["alpha"]
+
+
 def test_resolve_driver_returns_none_for_unknown_name():
     assert resolve_driver("no_such_driver") is None
 

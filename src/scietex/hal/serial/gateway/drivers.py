@@ -19,6 +19,7 @@ Functions:
     - verify_driver: Check that a descriptor's references resolve.
 """
 
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib.metadata import EntryPoint, entry_points
@@ -30,6 +31,8 @@ from .plugin_loader import (
     resolve_pdu,
     resolve_translator,
 )
+
+logger = logging.getLogger(__name__)
 
 ENTRY_POINT_GROUP = "scietex.modbus.drivers"
 
@@ -75,11 +78,21 @@ def discover_drivers(entries: Iterable[EntryPoint] | None = None) -> dict[str, M
     Raises:
         TypeError: If an entry point resolves to something that is not a
             `ModbusDriver`.
+
+    A driver package that fails to import is skipped rather than aborting the
+    catalogue: one broken plugin must not hide every other driver, and callers
+    treat a missing name as "not installed".
     """
     source = entries if entries is not None else entry_points(group=ENTRY_POINT_GROUP)
     discovered: dict[str, ModbusDriver] = {}
     for entry_point in source:
-        driver = entry_point.load()
+        try:
+            driver = entry_point.load()
+        except Exception:
+            logger.exception(
+                "Skipping Modbus driver %r: entry point failed to load", entry_point.name
+            )
+            continue
         if not isinstance(driver, ModbusDriver):
             raise TypeError(
                 f"Entry point {entry_point.name!r} resolved to "
