@@ -17,6 +17,10 @@ dynamic = ["version"]
 "Bug Tracker" = "https://github.com/bond-anton/scietex.hal.serial/issues"
 "Homepage" = "https://github.com/bond-anton/scietex.hal.serial"
 
+[project.entry-points."scietex.modbus.drivers"]
+scietex_ftmone = "scietex.hal.serial.gateway.builtin_drivers:scietex_ftmone"
+cyky_tm106b = "scietex.hal.serial.gateway.builtin_drivers:cyky_tm106b"
+
 [project.optional-dependencies]
 all = ["scietex.hal.serial[dev,test,lint,docs]"]
 dev = ["tox>=4.46.0"]

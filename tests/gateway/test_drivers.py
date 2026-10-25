@@ -5,7 +5,7 @@ from importlib.metadata import EntryPoint
 import pytest
 
 try:
-    from src.scietex.hal.serial.gateway.drivers import (
+    from scietex.hal.serial.gateway.drivers import (
         ENTRY_POINT_GROUP,
         ModbusDriver,
         discover_drivers,
@@ -13,7 +13,7 @@ try:
         verify_driver,
     )
 except ModuleNotFoundError:
-    from scietex.hal.serial.gateway.drivers import (
+    from src.scietex.hal.serial.gateway.drivers import (
         ENTRY_POINT_GROUP,
         ModbusDriver,
         discover_drivers,
@@ -140,3 +140,40 @@ def test_verify_driver_reports_a_bad_translator():
     message = verify_driver(driver)
     assert message is not None
     assert "translator" in message
+
+
+def test_builtin_descriptors_are_well_formed():
+    try:
+        from scietex.hal.serial.gateway.builtin_drivers import (
+            cyky_tm106b,
+            scietex_ftmone,
+        )
+    except ModuleNotFoundError:
+        from src.scietex.hal.serial.gateway.builtin_drivers import (
+            cyky_tm106b,
+            scietex_ftmone,
+        )
+
+    assert scietex_ftmone.name == "scietex_ftmone"
+    assert scietex_ftmone.framer == "RTU"
+    assert scietex_ftmone.decoder is None
+    assert scietex_ftmone.pdus == []
+    assert scietex_ftmone.translator is None
+    assert scietex_ftmone.device_type == "Film Thickness Monitor"
+
+    assert cyky_tm106b.name == "cyky_tm106b"
+    assert cyky_tm106b.framer == "ASCII"
+    assert cyky_tm106b.device_type == "Film Thickness Monitor"
+
+    assert verify_driver(scietex_ftmone) is None
+    assert verify_driver(cyky_tm106b) is None
+
+
+def test_builtin_drivers_are_declared_as_entry_points():
+    """The declarations are install-time; skip when metadata is stale."""
+    from importlib.metadata import entry_points
+
+    declared = {entry.name for entry in entry_points(group=ENTRY_POINT_GROUP)}
+    if not declared:
+        pytest.skip("installed metadata carries no scietex.modbus.drivers group")
+    assert {"scietex_ftmone", "cyky_tm106b"} <= declared

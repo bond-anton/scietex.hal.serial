@@ -1,9 +1,9 @@
 """Synthetic driver descriptors used to exercise the registry."""
 
 try:
-    from src.scietex.hal.serial.gateway.drivers import ModbusDriver
-except ModuleNotFoundError:
     from scietex.hal.serial.gateway.drivers import ModbusDriver
+except ModuleNotFoundError:
+    from src.scietex.hal.serial.gateway.drivers import ModbusDriver
 
 alpha_driver = ModbusDriver(
     name="alpha",
