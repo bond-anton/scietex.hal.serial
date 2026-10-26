@@ -10,7 +10,7 @@ See ``docs/design/modbus-gateway.md`` and
 ``docs/design/modbus-gateway-nonstandard.md``.
 """
 
-from .config import GatewayConfig, GatewayDeviceConfig
+from .config import GatewayCircuitBreakerConfig, GatewayConfig, GatewayDeviceConfig
 from .drivers import (
     ENTRY_POINT_GROUP,
     ModbusDriver,
@@ -34,6 +34,7 @@ from .translator import GatewayTranslator
 
 __all__ = [
     "ENTRY_POINT_GROUP",
+    "GatewayCircuitBreakerConfig",
     "GatewayConfig",
     "GatewayConfigError",
     "GatewayDeviceConfig",

@@ -18,6 +18,7 @@ See ``docs/design/modbus-gateway.md`` and
 """
 
 import asyncio
+import time
 from logging import Logger, getLogger
 
 from pymodbus.client import AsyncModbusSerialClient
@@ -48,13 +49,18 @@ class _DeviceRuntime:
     Attributes:
         framer (FramerBase): The framer instance for this device.
         translator (GatewayTranslator | None): Translator, or None for pass-through.
+        consecutive_failures (int): Failures since the last success.
+        open_until (float | None): Monotonic deadline until which the device is
+            skipped, or None when the circuit is closed.
     """
 
-    __slots__ = ("framer", "translator")
+    __slots__ = ("framer", "translator", "consecutive_failures", "open_until")
 
     def __init__(self, framer: FramerBase, translator) -> None:
         self.framer = framer
         self.translator = translator
+        self.consecutive_failures = 0
+        self.open_until: float | None = None
 
 
 class ModbusGateway:
@@ -237,12 +243,50 @@ class ModbusGateway:
 
         self._metrics.record_request(device_id)
         self._metrics.touch(device_id)
+        if self._circuit_open(device_id, runtime):
+            self._metrics.record_error(device_id)
+            return ExceptionResponse(request.function_code, _GATEWAY_TARGET_FAILED)
         try:
             return await self._forward(device_id, request, runtime)
         except (ModbusException, GatewayError, asyncio.TimeoutError) as exc:
             self.logger.error("Bus failure for device %s: %s", device_id, exc)
             self._metrics.record_error(device_id)
+            self._record_failure(device_id, runtime)
             return ExceptionResponse(request.function_code, _GATEWAY_TARGET_FAILED)
+
+    def _circuit_open(self, device_id: int, runtime: _DeviceRuntime) -> bool:
+        """Whether the device is currently skipped by the circuit breaker."""
+        if runtime.open_until is None:
+            return False
+        if time.monotonic() < runtime.open_until:
+            return True
+        # Cooldown elapsed: let the next request probe the device (half-open).
+        runtime.open_until = None
+        return False
+
+    def _record_failure(self, device_id: int, runtime: _DeviceRuntime) -> None:
+        """Count a failure and open the circuit once the threshold is reached."""
+        threshold = self.config.circuit_breaker.failure_threshold
+        if threshold == 0:
+            return
+        runtime.consecutive_failures += 1
+        if runtime.consecutive_failures < threshold:
+            return
+        runtime.open_until = time.monotonic() + self.config.circuit_breaker.cooldown
+        self.logger.warning(
+            "Device %s unavailable after %d consecutive failures; skipping it for %.1f s",
+            device_id,
+            runtime.consecutive_failures,
+            self.config.circuit_breaker.cooldown,
+        )
+
+    def _record_success(self, device_id: int, runtime: _DeviceRuntime) -> None:
+        """Close the circuit and log recovery if the device was being skipped."""
+        was_open = runtime.open_until is not None
+        runtime.consecutive_failures = 0
+        runtime.open_until = None
+        if was_open:
+            self.logger.warning("Device %s is available again", device_id)
 
     async def _ensure_connected(self) -> None:
         """
@@ -290,6 +334,7 @@ class ModbusGateway:
             vendor_response = await self._bus.execute(False, vendor_request)
 
         self._metrics.record_retries(device_id, getattr(vendor_response, "retries", 0))
+        self._record_success(device_id, runtime)
         if runtime.translator is not None:
             return runtime.translator.to_standard(vendor_response)
         return vendor_response

@@ -1,7 +1,9 @@
 """Test the gateway forwarding core (no TCP)."""
 
 import asyncio
+import logging
 import os
+import time
 from pathlib import Path
 
 import pytest
@@ -14,6 +16,7 @@ from pymodbus.pdu.register_message import (
 try:
     from src.scietex.hal.serial.config import ModbusSerialConnectionConfig
     from src.scietex.hal.serial.gateway.config import (
+        GatewayCircuitBreakerConfig,
         GatewayConfig,
         GatewayDeviceConfig,
     )
@@ -22,6 +25,7 @@ try:
 except ModuleNotFoundError:
     from scietex.hal.serial.config import ModbusSerialConnectionConfig
     from scietex.hal.serial.gateway.config import (
+        GatewayCircuitBreakerConfig,
         GatewayConfig,
         GatewayDeviceConfig,
     )
@@ -436,6 +440,153 @@ async def test_reconnect_closes_stale_transport_first(gateway, bus_server):
         assert isinstance(response, ReadHoldingRegistersResponse)
         assert response.registers == [1]
         assert calls == ["close", "connect"]
+    finally:
+        await gateway.stop()
+        await bus_server.stop()
+
+
+def _breaker_gateway(vsp_fixture, logger_fixture, *, threshold=3, cooldown=30.0):
+    """A gateway with a circuit breaker and two devices (1 live, 2 absent)."""
+    serial = ModbusSerialConnectionConfig(vsp_fixture.serial_ports[1], timeout=0.2)
+    config = GatewayConfig(
+        serial=serial,
+        devices={
+            1: GatewayDeviceConfig(device_id=1, framer="RTU"),
+            2: GatewayDeviceConfig(device_id=2, framer="RTU"),
+        },
+        circuit_breaker=GatewayCircuitBreakerConfig(failure_threshold=threshold, cooldown=cooldown),
+    )
+    return ModbusGateway(config, logger=logger_fixture)
+
+
+@pytest.mark.asyncio
+async def test_circuit_opens_after_threshold(vsp_fixture, logger_fixture):
+    """A device that fails ``threshold`` times is skipped without touching the bus."""
+    # No bus server: every request to device 2 times out.
+    gateway = _breaker_gateway(vsp_fixture, logger_fixture, threshold=3)
+    await gateway.start()
+    try:
+        request = ReadHoldingRegistersRequest(address=0, count=1, dev_id=2)
+        for _ in range(3):
+            response = await gateway.handle_request(2, request)
+            assert isinstance(response, ExceptionResponse)
+            assert response.exception_code == 0x0B
+
+        runtime = gateway._devices[2]
+        assert runtime.open_until is not None
+
+        calls = []
+        original_execute = gateway._bus.execute
+
+        async def tracking_execute(*args, **kwargs):
+            calls.append(args)
+            return await original_execute(*args, **kwargs)
+
+        gateway._bus.execute = tracking_execute
+        response = await gateway.handle_request(2, request)
+        assert isinstance(response, ExceptionResponse)
+        assert response.exception_code == 0x0B
+        assert calls == []
+    finally:
+        await gateway.stop()
+
+
+@pytest.mark.asyncio
+async def test_circuit_skip_does_not_block_other_devices(vsp_fixture, logger_fixture, bus_server):
+    """An open circuit on one device leaves a healthy device unaffected."""
+    await bus_server.start()
+    gateway = _breaker_gateway(vsp_fixture, logger_fixture, threshold=1)
+    await gateway.start()
+    try:
+        gateway._devices[2].open_until = time.monotonic() + 30.0
+
+        live = ReadHoldingRegistersRequest(address=0, count=2, dev_id=1)
+        response = await gateway.handle_request(1, live)
+        assert isinstance(response, ReadHoldingRegistersResponse)
+        assert response.registers == [1, 2]
+    finally:
+        await gateway.stop()
+        await bus_server.stop()
+
+
+@pytest.mark.asyncio
+async def test_circuit_half_open_probe_closes_on_success(vsp_fixture, logger_fixture, bus_server):
+    """After the cooldown a successful probe closes the circuit."""
+    await bus_server.start()
+    gateway = _breaker_gateway(vsp_fixture, logger_fixture, threshold=1, cooldown=0.0)
+    await gateway.start()
+    try:
+        request = ReadHoldingRegistersRequest(address=0, count=2, dev_id=1)
+        await gateway.handle_request(1, request)
+        runtime = gateway._devices[1]
+        runtime.consecutive_failures = 1
+        runtime.open_until = time.monotonic() - 1
+
+        response = await gateway.handle_request(1, request)
+        assert isinstance(response, ReadHoldingRegistersResponse)
+        assert runtime.consecutive_failures == 0
+        assert runtime.open_until is None
+    finally:
+        await gateway.stop()
+        await bus_server.stop()
+
+
+@pytest.mark.asyncio
+async def test_circuit_half_open_reopens_on_failure(vsp_fixture, logger_fixture):
+    """A failed probe after the cooldown re-opens the circuit."""
+    # No bus server: the probe to device 2 times out.
+    gateway = _breaker_gateway(vsp_fixture, logger_fixture, threshold=1, cooldown=30.0)
+    await gateway.start()
+    try:
+        request = ReadHoldingRegistersRequest(address=0, count=1, dev_id=2)
+        await gateway.handle_request(2, request)
+        runtime = gateway._devices[2]
+        assert runtime.open_until is not None
+
+        runtime.open_until = time.monotonic() - 1
+        response = await gateway.handle_request(2, request)
+        assert isinstance(response, ExceptionResponse)
+        assert response.exception_code == 0x0B
+        assert runtime.open_until is not None
+        assert runtime.open_until > time.monotonic()
+    finally:
+        await gateway.stop()
+
+
+@pytest.mark.asyncio
+async def test_circuit_disabled_when_threshold_zero(vsp_fixture, logger_fixture):
+    """``failure_threshold: 0`` disables the breaker: every request reaches the bus."""
+    # No bus server: every request to device 2 times out.
+    gateway = _breaker_gateway(vsp_fixture, logger_fixture, threshold=0)
+    await gateway.start()
+    try:
+        request = ReadHoldingRegistersRequest(address=0, count=1, dev_id=2)
+        for _ in range(5):
+            response = await gateway.handle_request(2, request)
+            assert isinstance(response, ExceptionResponse)
+        assert gateway._devices[2].open_until is None
+    finally:
+        await gateway.stop()
+
+
+@pytest.mark.asyncio
+async def test_circuit_logs_unavailable_and_recovered(
+    vsp_fixture, logger_fixture, bus_server, caplog
+):
+    """Opening the circuit logs a WARNING; recovery logs another."""
+    await bus_server.start()
+    gateway = _breaker_gateway(vsp_fixture, logger_fixture, threshold=1, cooldown=0.0)
+    await gateway.start()
+    try:
+        runtime = gateway._devices[2]
+        with caplog.at_level(logging.WARNING):
+            gateway._record_failure(2, runtime)
+        assert any("unavailable" in r.message for r in caplog.records)
+
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            gateway._record_success(2, runtime)
+        assert any("available again" in r.message for r in caplog.records)
     finally:
         await gateway.stop()
         await bus_server.stop()

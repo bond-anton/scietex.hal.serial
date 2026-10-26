@@ -9,6 +9,7 @@ from .config import (
 from .gateway import (
     ENTRY_POINT_GROUP,
     DeviceCounters,
+    GatewayCircuitBreakerConfig,
     GatewayConfig,
     GatewayConfigError,
     GatewayDeviceConfig,
@@ -50,6 +51,7 @@ __all__ = [
     "RS485Client",
     "RS485Server",
     "ReactiveSequentialDataBlock",
+    "GatewayCircuitBreakerConfig",
     "GatewayConfig",
     "GatewayDeviceConfig",
     "GatewayConfigError",
