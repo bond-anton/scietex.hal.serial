@@ -73,6 +73,41 @@ class GatewayDeviceConfig:
 
 
 @dataclass(slots=True)
+class GatewayCircuitBreakerConfig:
+    """
+    Per-device circuit breaker settings.
+
+    A device that fails ``failure_threshold`` requests in a row is skipped for
+    ``cooldown`` seconds: requests to it return 0x0B immediately without
+    touching the bus, so an absent device no longer blocks the devices that
+    share the line. After the cooldown the next request probes the device; a
+    success closes the circuit, a failure re-opens it for another cooldown.
+
+    Attributes:
+        failure_threshold (int): Consecutive failures that open the circuit.
+            ``0`` disables the breaker (every request reaches the bus).
+        cooldown (float): Seconds to skip a device after the circuit opens.
+    """
+
+    failure_threshold: int = 3
+    cooldown: float = 30.0
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.failure_threshold, int) or isinstance(self.failure_threshold, bool):
+            raise GatewayConfigError(
+                f"failure_threshold must be an int, got: {type(self.failure_threshold)}"
+            )
+        if self.failure_threshold < 0:
+            raise GatewayConfigError(
+                f"failure_threshold cannot be negative, got: {self.failure_threshold}"
+            )
+        if not isinstance(self.cooldown, (int, float)) or isinstance(self.cooldown, bool):
+            raise GatewayConfigError(f"cooldown must be a number, got: {type(self.cooldown)}")
+        if self.cooldown < 0:
+            raise GatewayConfigError(f"cooldown cannot be negative, got: {self.cooldown}")
+
+
+@dataclass(slots=True)
 class GatewayConfig:
     """
     Top-level gateway configuration.
@@ -87,6 +122,8 @@ class GatewayConfig:
         allow_unknown_devices (bool): If True, devices not in `devices` are
             routed with the default framer; if False, they are rejected.
         bus_retries (int): Retry count for bus transactions.
+        circuit_breaker (GatewayCircuitBreakerConfig): Per-device circuit
+            breaker settings.
     """
 
     serial: ModbusSerialConnectionConfigModel
@@ -96,6 +133,9 @@ class GatewayConfig:
     devices: dict[int, GatewayDeviceConfig] = field(default_factory=dict)
     allow_unknown_devices: bool = False
     bus_retries: int = 0
+    circuit_breaker: GatewayCircuitBreakerConfig = field(
+        default_factory=GatewayCircuitBreakerConfig
+    )
 
     def __post_init__(self) -> None:
         if not isinstance(self.serial, ModbusSerialConnectionConfigModel):
@@ -115,6 +155,11 @@ class GatewayConfig:
             raise GatewayConfigError(f"bus_retries must be an int, got: {type(self.bus_retries)}")
         if self.bus_retries < 0:
             raise GatewayConfigError(f"bus_retries cannot be negative, got: {self.bus_retries}")
+        if not isinstance(self.circuit_breaker, GatewayCircuitBreakerConfig):
+            raise GatewayConfigError(
+                "circuit_breaker must be a GatewayCircuitBreakerConfig, "
+                f"got: {type(self.circuit_breaker)}"
+            )
         for device_id, device in self.devices.items():
             if device_id != device.device_id:
                 raise GatewayConfigError(
