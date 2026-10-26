@@ -395,3 +395,47 @@ async def test_concurrent_requests_serialized(gateway, bus_server):
     finally:
         await gateway.stop()
         await bus_server.stop()
+
+
+@pytest.mark.asyncio
+async def test_reconnect_closes_stale_transport_first(gateway, bus_server):
+    """Reconnecting closes the stale transport before opening a new one.
+
+    pyserial opens the port with ``exclusive=True``, so a transport that is
+    still open keeps the lock and the reconnect fails with EBUSY -- the gateway
+    then answers 0x0B forever. The virtual serial pair used here does not
+    enforce that lock, so this asserts the ordering the fix guarantees rather
+    than the EBUSY failure itself.
+    """
+    await bus_server.start()
+    await gateway.start()
+    try:
+        request = ReadHoldingRegistersRequest(address=0, count=1, dev_id=1)
+        await gateway.handle_request(1, request)
+
+        stale = gateway._bus.ctx.transport
+        assert stale is not None
+        calls = []
+        original_close = gateway._bus.close
+        original_connect = gateway._bus.connect
+
+        def tracking_close():
+            calls.append("close")
+            return original_close()
+
+        async def tracking_connect():
+            calls.append("connect")
+            return await original_connect()
+
+        gateway._bus.close = tracking_close
+        gateway._bus.connect = tracking_connect
+        gateway._bus.ctx.connection_lost(None)
+        assert gateway._bus.ctx.transport is None
+
+        response = await gateway.handle_request(1, request)
+        assert isinstance(response, ReadHoldingRegistersResponse)
+        assert response.registers == [1]
+        assert calls == ["close", "connect"]
+    finally:
+        await gateway.stop()
+        await bus_server.stop()
