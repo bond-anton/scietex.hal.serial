@@ -253,12 +253,21 @@ class ModbusGateway:
         connect failed would never recover. Reconnecting here makes the
         documented "retry on the next request" behavior real.
 
+        The transport is closed before reconnecting because pyserial opens the
+        port with ``exclusive=True``: a still-open transport keeps the lock, so
+        the reconnect fails with ``EBUSY`` and the gateway stays wedged. The
+        client's own reconnect task is cancelled for the same reason -- it would
+        otherwise race this reconnect for the same exclusive lock.
+
         Raises:
             GatewayError: If the bus is not started or the reconnect fails.
         """
         if self._bus is None:
             raise GatewayError("Gateway bus is not started")
-        if self._bus.ctx.transport is None and not await self._bus.connect():
+        if self._bus.ctx.transport is not None:
+            return
+        self._bus.close()
+        if not await self._bus.connect():
             raise GatewayError(f"Gateway bus could not be opened on {self.config.serial.port}")
 
     async def _forward(
