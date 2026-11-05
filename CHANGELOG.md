@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-11-05
+
+### Added
+
+- Built-in driver descriptors for the Intek SPE-B and the Vesper E5-8200 /
+  E4-8400 drives (`intek_spe_b`, `vesper_e5_8200`, `vesper_e4_8400`). All three
+  speak standard Modbus RTU, so the gateway routes them with the built-in RTU
+  framer and no translator — the same shape as the film thickness monitors.
+
+### Changed
+
+- A gateway descriptor is now built in whenever the device speaks plain Modbus
+  and the gateway needs no vendor code to route it. Previously the VFD
+  descriptors lived in `scietex.hal.vfd`, which forced every gateway image to
+  install that package as an extra even though the gateway imports nothing from
+  it. An extra is now reserved for devices whose protocol the gateway cannot
+  frame without vendor code.
+
 ## [2.0.2] - 2026-10-07
 
 ### Fixed
