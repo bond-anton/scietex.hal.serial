@@ -154,46 +154,30 @@ def test_verify_driver_reports_a_bad_translator():
 def test_builtin_descriptors_are_well_formed():
     try:
         from scietex.hal.serial.gateway.builtin_drivers import (
-            cyky_tm106b,
-            intek_spe_b,
-            scietex_ftmone,
-            vesper_e4_8400,
-            vesper_e5_8200,
+            standard_ascii,
+            standard_rtu,
         )
     except ModuleNotFoundError:
         from src.scietex.hal.serial.gateway.builtin_drivers import (
-            cyky_tm106b,
-            intek_spe_b,
-            scietex_ftmone,
-            vesper_e4_8400,
-            vesper_e5_8200,
+            standard_ascii,
+            standard_rtu,
         )
 
-    assert scietex_ftmone.name == "scietex_ftmone"
-    assert scietex_ftmone.framer == "RTU"
-    assert scietex_ftmone.decoder is None
-    assert scietex_ftmone.pdus == []
-    assert scietex_ftmone.translator is None
-    assert scietex_ftmone.device_type == "Film Thickness Monitor"
+    assert standard_rtu.name == "standard_rtu"
+    assert standard_rtu.framer == "RTU"
+    assert standard_rtu.decoder is None
+    assert standard_rtu.pdus == []
+    assert standard_rtu.translator is None
+    assert standard_rtu.device_type == "Modbus Device"
 
-    assert cyky_tm106b.name == "cyky_tm106b"
-    assert cyky_tm106b.framer == "ASCII"
-    assert cyky_tm106b.device_type == "Film Thickness Monitor"
+    assert standard_ascii.name == "standard_ascii"
+    assert standard_ascii.framer == "ASCII"
+    assert standard_ascii.decoder is None
+    assert standard_ascii.pdus == []
+    assert standard_ascii.translator is None
+    assert standard_ascii.device_type == "Modbus Device"
 
-    for vfd in (intek_spe_b, vesper_e5_8200, vesper_e4_8400):
-        assert vfd.framer == "RTU"
-        assert vfd.decoder is None
-        assert vfd.pdus == []
-        assert vfd.translator is None
-        assert vfd.device_type == "Variable Frequency Drive"
-
-    for driver in (
-        scietex_ftmone,
-        cyky_tm106b,
-        intek_spe_b,
-        vesper_e5_8200,
-        vesper_e4_8400,
-    ):
+    for driver in (standard_rtu, standard_ascii):
         assert verify_driver(driver) is None
 
 
@@ -204,10 +188,28 @@ def test_builtin_drivers_are_declared_as_entry_points():
     declared = {entry.name for entry in entry_points(group=ENTRY_POINT_GROUP)}
     if not declared:
         pytest.skip("installed metadata carries no scietex.modbus.drivers group")
-    assert {
-        "scietex_ftmone",
-        "cyky_tm106b",
-        "intek_spe_b",
-        "vesper_e5_8200",
-        "vesper_e4_8400",
-    } <= declared
+    assert {"standard_rtu", "standard_ascii"} <= declared
+
+
+def test_vendor_named_descriptors_are_gone():
+    """A plain-Modbus device picks a framing, not a vendor label.
+
+    The five vendor-named descriptors were removed in favour of the two generic
+    ones. Re-adding one would reintroduce the per-vendor catalogue this change
+    exists to remove, so the absence is asserted rather than assumed.
+    """
+    from importlib.metadata import entry_points
+
+    declared = {entry.name for entry in entry_points(group=ENTRY_POINT_GROUP)}
+    if not declared:
+        pytest.skip("installed metadata carries no scietex.modbus.drivers group")
+    assert (
+        not {
+            "scietex_ftmone",
+            "cyky_tm106b",
+            "intek_spe_b",
+            "vesper_e5_8200",
+            "vesper_e4_8400",
+        }
+        & declared
+    )

@@ -1,70 +1,39 @@
 """
 Built-in Modbus driver descriptors.
 
-These are the drivers this package itself provides: standard Modbus devices
-that need no custom decoder, PDU, or translator. They are advertised through the
-``scietex.modbus.drivers`` entry point group declared in ``pyproject.toml``.
+A descriptor names the four gateway plugin references a device needs (framer,
+decoder, PDUs, translator). These two are the protocol shapes this package
+itself provides: plain Modbus over RTU or ASCII, with no custom decoder, PDU, or
+translator. They are advertised through the ``scietex.modbus.drivers`` entry
+point group declared in ``pyproject.toml``.
 
-A descriptor is built in when the device speaks plain Modbus and the gateway
-needs no vendor code to route it. The vendor package that owns the device's HAL
-client is a separate concern: ``scietex.hal.vfd`` ships the Intek and Vesper
-clients, but their gateway descriptors live here because they are plain RTU.
+A device that speaks plain Modbus needs nothing beyond its framing, so it picks
+one of these two and carries its own identity in the device name. A descriptor
+of its own would repeat the same four empty fields under a vendor label. Vendor
+packages are only involved when the gateway must import their code to route a
+device — a translator, a custom framer, or custom PDUs — and those descriptors
+live in the vendor package and are installed as an extra.
 """
 
 from .drivers import ModbusDriver
 
-scietex_ftmone = ModbusDriver(
-    name="scietex_ftmone",
-    label="Scietex FtmOne",
-    description="Scietex ftmONE film thickness monitor speaking standard Modbus RTU.",
-    device_type="Film Thickness Monitor",
+standard_rtu = ModbusDriver(
+    name="standard_rtu",
+    label="Standard Modbus RTU",
+    description="Any device speaking plain Modbus RTU. The default for a serial bus.",
+    device_type="Modbus Device",
     framer="RTU",
     decoder=None,
     pdus=[],
     translator=None,
 )
 
-cyky_tm106b = ModbusDriver(
-    name="cyky_tm106b",
-    label="CYKY TM106B",
-    description="CYKY TM106B film thickness monitor speaking standard Modbus ASCII.",
-    device_type="Film Thickness Monitor",
+standard_ascii = ModbusDriver(
+    name="standard_ascii",
+    label="Standard Modbus ASCII",
+    description="Any device speaking plain Modbus ASCII.",
+    device_type="Modbus Device",
     framer="ASCII",
-    decoder=None,
-    pdus=[],
-    translator=None,
-)
-
-intek_spe_b = ModbusDriver(
-    name="intek_spe_b",
-    label="Intek SPE-B",
-    description="Intek SPE-B variable frequency drive speaking standard Modbus RTU.",
-    device_type="Variable Frequency Drive",
-    framer="RTU",
-    decoder=None,
-    pdus=[],
-    translator=None,
-)
-
-vesper_e5_8200 = ModbusDriver(
-    name="vesper_e5_8200",
-    label="Vesper E5-8200",
-    description="Vesper E5-8200 variable frequency drive speaking standard Modbus RTU.",
-    device_type="Variable Frequency Drive",
-    framer="RTU",
-    decoder=None,
-    pdus=[],
-    translator=None,
-)
-
-vesper_e4_8400 = ModbusDriver(
-    name="vesper_e4_8400",
-    label="Vesper E4-8400",
-    description=(
-        "Vesper E4-8400 / E4-P8402 variable frequency drive speaking standard Modbus RTU."
-    ),
-    device_type="Variable Frequency Drive",
-    framer="RTU",
     decoder=None,
     pdus=[],
     translator=None,

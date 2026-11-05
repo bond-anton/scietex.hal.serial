@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-11-05
+
+### Added
+
+- Two generic driver descriptors, `standard_rtu` and `standard_ascii`. A device
+  that speaks plain Modbus picks one of these and carries its own identity in
+  the device name.
+
+### Removed
+
+- The five vendor-named descriptors (`scietex_ftmone`, `cyky_tm106b`,
+  `intek_spe_b`, `vesper_e5_8200`, `vesper_e4_8400`). Each was a frozen
+  dataclass whose only non-empty field was the framer, so it named a protocol
+  shape rather than a device. A descriptor is now reserved for a device the
+  gateway cannot route without vendor code — a translator, a custom framer, or
+  custom PDUs — and those live in the vendor package.
+
+  A database that stored one of the old names needs
+  `scripts/migrate_generic_driver_names.py` from `scietex.api156.equipment.modbus`
+  before its devices are edited again.
+
 ## [2.5.0] - 2026-11-05
 
 ### Added
