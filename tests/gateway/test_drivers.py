@@ -155,12 +155,18 @@ def test_builtin_descriptors_are_well_formed():
     try:
         from scietex.hal.serial.gateway.builtin_drivers import (
             cyky_tm106b,
+            intek_spe_b,
             scietex_ftmone,
+            vesper_e4_8400,
+            vesper_e5_8200,
         )
     except ModuleNotFoundError:
         from src.scietex.hal.serial.gateway.builtin_drivers import (
             cyky_tm106b,
+            intek_spe_b,
             scietex_ftmone,
+            vesper_e4_8400,
+            vesper_e5_8200,
         )
 
     assert scietex_ftmone.name == "scietex_ftmone"
@@ -174,8 +180,21 @@ def test_builtin_descriptors_are_well_formed():
     assert cyky_tm106b.framer == "ASCII"
     assert cyky_tm106b.device_type == "Film Thickness Monitor"
 
-    assert verify_driver(scietex_ftmone) is None
-    assert verify_driver(cyky_tm106b) is None
+    for vfd in (intek_spe_b, vesper_e5_8200, vesper_e4_8400):
+        assert vfd.framer == "RTU"
+        assert vfd.decoder is None
+        assert vfd.pdus == []
+        assert vfd.translator is None
+        assert vfd.device_type == "Variable Frequency Drive"
+
+    for driver in (
+        scietex_ftmone,
+        cyky_tm106b,
+        intek_spe_b,
+        vesper_e5_8200,
+        vesper_e4_8400,
+    ):
+        assert verify_driver(driver) is None
 
 
 def test_builtin_drivers_are_declared_as_entry_points():
@@ -185,4 +204,10 @@ def test_builtin_drivers_are_declared_as_entry_points():
     declared = {entry.name for entry in entry_points(group=ENTRY_POINT_GROUP)}
     if not declared:
         pytest.skip("installed metadata carries no scietex.modbus.drivers group")
-    assert {"scietex_ftmone", "cyky_tm106b"} <= declared
+    assert {
+        "scietex_ftmone",
+        "cyky_tm106b",
+        "intek_spe_b",
+        "vesper_e5_8200",
+        "vesper_e4_8400",
+    } <= declared

@@ -20,6 +20,9 @@ dynamic = ["version"]
 [project.entry-points."scietex.modbus.drivers"]
 scietex_ftmone = "scietex.hal.serial.gateway.builtin_drivers:scietex_ftmone"
 cyky_tm106b = "scietex.hal.serial.gateway.builtin_drivers:cyky_tm106b"
+intek_spe_b = "scietex.hal.serial.gateway.builtin_drivers:intek_spe_b"
+vesper_e5_8200 = "scietex.hal.serial.gateway.builtin_drivers:vesper_e5_8200"
+vesper_e4_8400 = "scietex.hal.serial.gateway.builtin_drivers:vesper_e4_8400"
 
 [project.optional-dependencies]
 all = ["scietex.hal.serial[dev,test,lint,docs]"]
