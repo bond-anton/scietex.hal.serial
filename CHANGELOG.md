@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `GatewayConfig.bus_timeout` bounds how long one request may hold the shared
+  serial bus, and `GatewayConfig.request_timeout` bounds how long a client may
+  wait for it. Both default to values derived from the serial timeout, the
+  retry count, and `bus_queue_depth` (new, default `4`), which is the number of
+  queued clients the lock-wait budget tolerates. The lock-wait derivation is
+  `(bus_timeout + 2 * serial_timeout + 0.1) * (bus_queue_depth + 1) +
+  serial_timeout`: it budgets one hold per client ahead plus the single resync
+  (reconnect and quarantine) a dirty bus may add. A request that cannot acquire
+  the bus in time now returns exception `0x06` (server device busy) instead of
+  `0x0B` (gateway target failed), because the target device was never addressed.
+- `GatewayConfig.client_timeout_floor` publishes the lower bound a client must
+  exceed for its per-request socket timeout:
+  `request_timeout + bus_timeout + 2 * serial_timeout + 0.1`. A client that
+  times out first sees only its own library timeout -- no Modbus exception PDU
+  and no gateway metric, since the gateway cannot observe the disconnect -- and
+  its request may still be executing, so a retry queues behind it. The resync
+  response window (`GatewayConfig.resync_window`) is validated at construction
+  like the other budgets: zero, negative, non-finite, and non-numeric values are
+  rejected.
+
+### Fixed
+
+- A request that outlives the hold budget no longer poisons the next one. The
+  abandoned transaction is cancelled mid-wire, and RTU frames carry no usable
+  transaction id, so the device's late reply used to be accepted as the answer
+  to the next request for the same device id. The gateway now marks the bus
+  dirty on expiry, closes and reopens the transport before the next request,
+  and lets the remainder of the response window expire before transmitting.
+  The quarantine is recomputed after the reopen, so the connect overhead is not
+  added to it, and the dirty flag is cleared once the reopen and the window have
+  completed -- not only after the following transaction succeeds. A failing
+  transaction after a successful resync no longer reconnects before every later
+  request.
+- A device that answers with a Modbus exception response is no longer counted
+  as a failure by the circuit breaker. It responded, so it is alive; counting
+  device exceptions let any network peer open a healthy device's breaker, and
+  `isError()` also flags vendor PDUs whose normal function code exceeds `0x80`.
+- A lock-wait rejection (`0x06`) is no longer booked as a device error in the
+  gateway metrics: no device failed, and `GatewayMetrics.errors` documents
+  gateway-level `0x0B` failures. The request is still counted by
+  `record_request`; there is no separate busy counter.
+
 ## [2.6.0] - 2026-11-05
 
 ### Added

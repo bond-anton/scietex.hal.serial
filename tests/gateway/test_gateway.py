@@ -5,8 +5,10 @@ import logging
 import os
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+from pymodbus.exceptions import ModbusIOException
 from pymodbus.pdu import ExceptionResponse
 from pymodbus.pdu.register_message import (
     ReadHoldingRegistersRequest,
@@ -20,6 +22,7 @@ try:
         GatewayConfig,
         GatewayDeviceConfig,
     )
+    from src.scietex.hal.serial.gateway.exceptions import GatewayConfigError
     from src.scietex.hal.serial.gateway.gateway import ModbusGateway
     from src.scietex.hal.serial.server.rs485_server import RS485Server
 except ModuleNotFoundError:
@@ -29,6 +32,7 @@ except ModuleNotFoundError:
         GatewayConfig,
         GatewayDeviceConfig,
     )
+    from scietex.hal.serial.gateway.exceptions import GatewayConfigError
     from scietex.hal.serial.gateway.gateway import ModbusGateway
     from scietex.hal.serial.server.rs485_server import RS485Server
 
@@ -567,6 +571,505 @@ async def test_circuit_disabled_when_threshold_zero(vsp_fixture, logger_fixture)
         assert gateway._devices[2].open_until is None
     finally:
         await gateway.stop()
+
+
+def _budget_gateway(vsp_fixture, logger_fixture, *, hold_timeout, request_timeout, threshold=3):
+    """A gateway with an explicit bus/request budget and two devices."""
+    serial = ModbusSerialConnectionConfig(vsp_fixture.serial_ports[1], timeout=0.5)
+    config = GatewayConfig(
+        serial=serial,
+        devices={
+            1: GatewayDeviceConfig(device_id=1, framer="RTU"),
+            2: GatewayDeviceConfig(device_id=2, framer="RTU"),
+        },
+        bus_timeout=hold_timeout,
+        request_timeout=request_timeout,
+        circuit_breaker=GatewayCircuitBreakerConfig(failure_threshold=threshold, cooldown=30.0),
+    )
+    return ModbusGateway(config, logger=logger_fixture)
+
+
+class _ScriptedBus:
+    """A bus stand-in with scripted connect and execute costs and results.
+
+    The last entry of ``connect_results``/``execute_results`` repeats. An
+    exception instance in ``execute_results`` is raised instead of returned.
+    """
+
+    def __init__(
+        self,
+        *,
+        connect_delay: float = 0.0,
+        hold_delay: float = 0.0,
+        connect_results: list[bool] | None = None,
+        execute_results: list,
+    ) -> None:
+        self.connect_delay = connect_delay
+        self.hold_delay = hold_delay
+        self._connect_results = connect_results or [True]
+        self._execute_results = execute_results
+        self.ctx = SimpleNamespace(transport=object(), framer=None, recv_buffer=b"")
+        self.connects = 0
+        self.closes = 0
+        self.hold_durations: list[float] = []
+
+    def close(self) -> None:
+        self.closes += 1
+        self.ctx.transport = None
+
+    async def connect(self) -> bool:
+        self.connects += 1
+        await asyncio.sleep(self.connect_delay)
+        result = self._next(self._connect_results)
+        if result:
+            self.ctx.transport = object()
+        return result
+
+    async def execute(self, no_response_expected, request):
+        started = time.monotonic()
+        await asyncio.sleep(self.hold_delay)
+        self.hold_durations.append(time.monotonic() - started)
+        result = self._next(self._execute_results)
+        if isinstance(result, BaseException):
+            raise result
+        return result
+
+    @staticmethod
+    def _next(results: list):
+        return results.pop(0) if len(results) > 1 else results[0]
+
+
+def _scripted_gateway(
+    vsp_fixture, logger_fixture, bus: _ScriptedBus, *, serial_timeout: float = 0.05, **kwargs
+):
+    """A gateway wired to a scripted bus, without opening a real transport."""
+    config = GatewayConfig(
+        serial=ModbusSerialConnectionConfig(vsp_fixture.serial_ports[1], timeout=serial_timeout),
+        devices={1: GatewayDeviceConfig(device_id=1, framer="RTU")},
+        **kwargs,
+    )
+    gateway = ModbusGateway(config, logger=logger_fixture)
+    gateway._build_runtimes()
+    gateway._bus = bus
+    return gateway, config
+
+
+@pytest.mark.asyncio
+async def test_dirty_bus_lock_wait_covers_one_resync(vsp_fixture, logger_fixture):
+    """A queued waiter survives the single resync a dirty bus may add.
+
+    ``request_timeout`` budgets one resync per holder ahead, so a client queued
+    behind a dirty holder is not rejected with 0x06 even though the holder's
+    occupancy exceeds ``bus_timeout`` by that resync. Repeated hold expiry can
+    dirty the bus again and legitimately produce 0x06: that is real congestion,
+    not a derivation error. Only one resync per dirty event is covered here.
+    """
+    serial_timeout = 0.6
+    hold_timeout = 0.3
+    response = ReadHoldingRegistersResponse(registers=[7])
+    bus = _ScriptedBus(
+        connect_delay=2 * serial_timeout,
+        hold_delay=0.22,
+        execute_results=[response],
+    )
+    gateway, config = _scripted_gateway(
+        vsp_fixture,
+        logger_fixture,
+        bus,
+        serial_timeout=serial_timeout,
+        bus_timeout=hold_timeout,
+        bus_queue_depth=2,
+    )
+    assert config.request_timeout == pytest.approx(
+        (hold_timeout + 2 * serial_timeout + 0.1) * 3 + serial_timeout
+    )
+    gateway._mark_bus_dirty()
+    responses = await asyncio.gather(
+        *(
+            gateway.handle_request(1, ReadHoldingRegistersRequest(address=index, count=1, dev_id=1))
+            for index in range(3)
+        )
+    )
+
+    assert all(isinstance(item, ReadHoldingRegistersResponse) for item in responses)
+    assert all(not isinstance(item, ExceptionResponse) for item in responses)
+    assert max(bus.hold_durations) < hold_timeout
+    # One dirty event, one resync; the successful reopen cleared the flag.
+    assert bus.connects == 1
+    assert bus.closes == 1
+    assert gateway._resync_deadline is None
+
+
+@pytest.mark.asyncio
+async def test_resync_success_is_not_repeated_when_the_next_transaction_fails(
+    vsp_fixture, logger_fixture
+):
+    """A completed resync clears the flag even if the following transaction fails.
+
+    An absent device or a pymodbus timeout is exactly the state that armed the
+    resync; treating it as "still dirty" would reconnect before every later
+    request and reset pymodbus's disconnect accounting each time.
+    """
+    bus = _ScriptedBus(
+        execute_results=[
+            ModbusIOException("device gone"),
+            ReadHoldingRegistersResponse(registers=[7]),
+        ]
+    )
+    gateway, _ = _scripted_gateway(vsp_fixture, logger_fixture, bus)
+    gateway._mark_bus_dirty()
+    try:
+        first = await gateway.handle_request(
+            1, ReadHoldingRegistersRequest(address=0, count=1, dev_id=1)
+        )
+        assert isinstance(first, ExceptionResponse)
+        assert first.exception_code == 0x0B
+        assert bus.connects == 1
+        assert bus.closes == 1
+        assert gateway._resync_deadline is None
+
+        second = await gateway.handle_request(
+            1, ReadHoldingRegistersRequest(address=0, count=1, dev_id=1)
+        )
+        assert isinstance(second, ReadHoldingRegistersResponse)
+        assert second.registers == [7]
+        assert bus.connects == 1
+        assert bus.closes == 1
+    finally:
+        await gateway.stop()
+
+
+@pytest.mark.asyncio
+async def test_resync_quarantine_is_not_extended_by_the_reopen(vsp_fixture, logger_fixture):
+    """The quarantine is measured from the deadline, not from the reopen.
+
+    A connect slower than the response window consumes the window instead of
+    having a full window appended after it.
+    """
+    bus = _ScriptedBus(
+        connect_delay=0.3,
+        execute_results=[ReadHoldingRegistersResponse(registers=[7])],
+    )
+    gateway, _ = _scripted_gateway(vsp_fixture, logger_fixture, bus, serial_timeout=0.2)
+    gateway._mark_bus_dirty()
+    started = time.monotonic()
+    await gateway._resync_bus(bus)
+    elapsed = time.monotonic() - started
+
+    # Pre-recompute behavior would sleep the full 0.2 s window after the 0.3 s
+    # connect; the fix returns as soon as the connect finishes.
+    assert elapsed < 0.4
+    assert bus.connects == 1
+    assert gateway._resync_deadline is None
+
+
+@pytest.mark.asyncio
+async def test_failed_reopen_keeps_the_resync_armed(vsp_fixture, logger_fixture):
+    """A failed reopen leaves the flag armed, so the next request retries it."""
+    bus = _ScriptedBus(
+        connect_results=[False, True],
+        execute_results=[ReadHoldingRegistersResponse(registers=[7])],
+    )
+    gateway, _ = _scripted_gateway(vsp_fixture, logger_fixture, bus)
+    gateway._mark_bus_dirty()
+    try:
+        first = await gateway.handle_request(
+            1, ReadHoldingRegistersRequest(address=0, count=1, dev_id=1)
+        )
+        assert isinstance(first, ExceptionResponse)
+        assert first.exception_code == 0x0B
+        assert bus.connects == 1
+        assert gateway._resync_deadline is not None
+
+        second = await gateway.handle_request(
+            1, ReadHoldingRegistersRequest(address=0, count=1, dev_id=1)
+        )
+        assert isinstance(second, ReadHoldingRegistersResponse)
+        assert second.registers == [7]
+        assert bus.connects == 2
+        assert gateway._resync_deadline is None
+    finally:
+        await gateway.stop()
+
+
+@pytest.mark.asyncio
+async def test_request_exceeding_bus_budget_returns_exception_and_releases_lock(
+    vsp_fixture, logger_fixture, bus_server
+):
+    """A transaction over the hold budget yields 0x0B and does not leak the lock."""
+    await bus_server.start()
+    gateway = _budget_gateway(vsp_fixture, logger_fixture, hold_timeout=0.05, request_timeout=2.0)
+    await gateway.start()
+    original_execute = gateway._bus.execute
+
+    async def wedged_execute(*args, **kwargs):
+        await asyncio.sleep(10)
+
+    gateway._bus.execute = wedged_execute
+    try:
+        request = ReadHoldingRegistersRequest(address=0, count=1, dev_id=1)
+        started = time.monotonic()
+        response = await gateway.handle_request(1, request)
+        elapsed = time.monotonic() - started
+
+        assert isinstance(response, ExceptionResponse)
+        assert response.exception_code == 0x0B
+        assert elapsed < 1.0
+        assert not gateway._lock.locked()
+
+        # The lock is usable again once the wedged transaction is cancelled.
+        gateway._bus.execute = original_execute
+        healthy = await gateway.handle_request(
+            1, ReadHoldingRegistersRequest(address=0, count=1, dev_id=1)
+        )
+        assert isinstance(healthy, ReadHoldingRegistersResponse)
+    finally:
+        await gateway.stop()
+        await bus_server.stop()
+
+
+@pytest.mark.asyncio
+async def test_request_exceeding_lock_budget_returns_server_device_busy(
+    vsp_fixture, logger_fixture, bus_server
+):
+    """A client that cannot acquire the lock in time gets 0x06, not a stall.
+
+    0x06 tells the caller the server is busy; 0x0B would claim the target
+    device failed, although it was never addressed.
+    """
+    await bus_server.start()
+    gateway = _budget_gateway(vsp_fixture, logger_fixture, hold_timeout=5.0, request_timeout=0.1)
+    await gateway.start()
+    calls = []
+    original_execute = gateway._bus.execute
+
+    async def tracking_execute(*args, **kwargs):
+        calls.append(args)
+        return await original_execute(*args, **kwargs)
+
+    gateway._bus.execute = tracking_execute
+    await gateway._lock.acquire()
+    try:
+        started = time.monotonic()
+        response = await gateway.handle_request(
+            1, ReadHoldingRegistersRequest(address=0, count=1, dev_id=1)
+        )
+        elapsed = time.monotonic() - started
+
+        assert isinstance(response, ExceptionResponse)
+        assert response.exception_code == 0x06
+        assert elapsed < 1.0
+        assert calls == []
+        assert gateway._devices[1].consecutive_failures == 0
+        # 0x06 means "never addressed": it is not a gateway-level 0x0B error.
+        assert gateway.metrics.errors == 0
+        assert gateway.metrics.devices[1].errors == 0
+    finally:
+        gateway._lock.release()
+        await gateway.stop()
+        await bus_server.stop()
+
+
+@pytest.mark.asyncio
+async def test_wedged_device_does_not_block_a_concurrent_client(
+    vsp_fixture, logger_fixture, bus_server
+):
+    """A live device answers while another device is wedged holding the bus lock."""
+    await bus_server.start()
+    gateway = _budget_gateway(vsp_fixture, logger_fixture, hold_timeout=0.2, request_timeout=2.0)
+    await gateway.start()
+    original_execute = gateway._bus.execute
+
+    async def wedged_execute(no_response_expected, request):
+        if request.dev_id == 2:
+            await asyncio.sleep(10)
+        return await original_execute(no_response_expected, request)
+
+    gateway._bus.execute = wedged_execute
+    try:
+        wedged = asyncio.create_task(
+            gateway.handle_request(2, ReadHoldingRegistersRequest(address=0, count=1, dev_id=2))
+        )
+        # Let the wedged request take the lock first.
+        for _ in range(50):
+            if gateway._lock.locked():
+                break
+            await asyncio.sleep(0.01)
+
+        started = time.monotonic()
+        live = await asyncio.wait_for(
+            gateway.handle_request(1, ReadHoldingRegistersRequest(address=0, count=1, dev_id=1)),
+            timeout=2.0,
+        )
+        elapsed = time.monotonic() - started
+
+        assert isinstance(live, ReadHoldingRegistersResponse)
+        assert live.registers == [1]
+        assert elapsed < 1.0
+        assert isinstance(await wedged, ExceptionResponse)
+    finally:
+        await gateway.stop()
+        await bus_server.stop()
+
+
+@pytest.mark.asyncio
+async def test_hold_expiry_arms_the_resync_and_clears_it_on_success(
+    vsp_fixture, logger_fixture, bus_server
+):
+    """An expired transaction forces a reconnect before the next request transmits."""
+    await bus_server.start()
+    gateway = _budget_gateway(vsp_fixture, logger_fixture, hold_timeout=0.05, request_timeout=3.0)
+    await gateway.start()
+    original_execute = gateway._bus.execute
+    original_close = gateway._bus.close
+    original_connect = gateway._bus.connect
+    calls = []
+
+    async def wedged_execute(*args, **kwargs):
+        await asyncio.sleep(10)
+
+    async def tracking_connect():
+        calls.append("connect")
+        return await original_connect()
+
+    def tracking_close(*args, **kwargs):
+        calls.append("close")
+        return original_close(*args, **kwargs)
+
+    gateway._bus.execute = wedged_execute
+    gateway._bus.close = tracking_close
+    gateway._bus.connect = tracking_connect
+    try:
+        response = await gateway.handle_request(
+            1, ReadHoldingRegistersRequest(address=0, count=1, dev_id=1)
+        )
+        assert isinstance(response, ExceptionResponse)
+        assert response.exception_code == 0x0B
+        assert gateway._resync_deadline is not None
+        assert calls == []
+
+        gateway._bus.execute = original_execute
+        healthy = await gateway.handle_request(
+            1, ReadHoldingRegistersRequest(address=0, count=1, dev_id=1)
+        )
+        assert isinstance(healthy, ReadHoldingRegistersResponse)
+        assert calls == ["close", "connect"]
+        assert gateway._resync_deadline is None
+    finally:
+        await gateway.stop()
+        await bus_server.stop()
+
+
+@pytest.mark.asyncio
+async def test_hold_expiry_detected_when_pymodbus_converts_the_cancellation(
+    vsp_fixture, logger_fixture, bus_server
+):
+    """A hold expiry is still seen when pymodbus turns the cancel into an I/O error.
+
+    On an established transport pymodbus swallows the cancellation and raises
+    ``ModbusIOException("Request cancelled outside library.")`` instead of
+    propagating it, so a `TimeoutError` branch never fires. The gateway must
+    detect the expiry itself and still arm the resync.
+    """
+    await bus_server.start()
+    gateway = _budget_gateway(vsp_fixture, logger_fixture, hold_timeout=0.05, request_timeout=3.0)
+    await gateway.start()
+    original_execute = gateway._bus.execute
+
+    async def cancelling_execute(*args, **kwargs):
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError as exc:
+            raise ModbusIOException("Request cancelled outside library.") from exc
+
+    gateway._bus.execute = cancelling_execute
+    try:
+        response = await gateway.handle_request(
+            1, ReadHoldingRegistersRequest(address=0, count=1, dev_id=1)
+        )
+        assert isinstance(response, ExceptionResponse)
+        assert response.exception_code == 0x0B
+        assert gateway._resync_deadline is not None
+
+        gateway._bus.execute = original_execute
+        healthy = await gateway.handle_request(
+            1, ReadHoldingRegistersRequest(address=0, count=1, dev_id=1)
+        )
+        assert isinstance(healthy, ReadHoldingRegistersResponse)
+        assert healthy.registers == [1]
+    finally:
+        await gateway.stop()
+        await bus_server.stop()
+
+
+def test_gateway_rejects_a_budget_reset_to_none(vsp_fixture, logger_fixture):
+    """A budget cleared after config construction cannot become an unbounded wait."""
+    config = GatewayConfig(
+        serial=ModbusSerialConnectionConfig(vsp_fixture.serial_ports[1], timeout=0.5)
+    )
+    config.bus_timeout = None
+    with pytest.raises(GatewayConfigError):
+        ModbusGateway(config, logger=logger_fixture)
+
+    config.bus_timeout = 1.0
+    config.request_timeout = 0
+    with pytest.raises(GatewayConfigError):
+        ModbusGateway(config, logger=logger_fixture)
+
+    # The resync window sleeps inside the lock, so a zero window is rejected
+    # at the same boundary instead of silently disabling the quarantine.
+    config.request_timeout = 2.0
+    config._resync_window = 0.0
+    with pytest.raises(GatewayConfigError):
+        ModbusGateway(config, logger=logger_fixture)
+
+
+@pytest.mark.asyncio
+async def test_exception_response_does_not_open_the_breaker(
+    vsp_fixture, logger_fixture, bus_server
+):
+    """A device answering exception responses is alive, so its breaker stays closed.
+
+    The response also reaches the client unchanged.
+    """
+    await bus_server.start()
+    gateway = _budget_gateway(
+        vsp_fixture, logger_fixture, hold_timeout=1.0, request_timeout=3.0, threshold=2
+    )
+    await gateway.start()
+    original_execute = gateway._bus.execute
+    executed = []
+
+    async def exception_execute(no_response_expected, request):
+        executed.append(request.dev_id)
+        if request.dev_id == 2:
+            return ExceptionResponse(request.function_code, 0x02)
+        return await original_execute(no_response_expected, request)
+
+    gateway._bus.execute = exception_execute
+    try:
+        request = ReadHoldingRegistersRequest(address=0, count=1, dev_id=2)
+        for _ in range(5):
+            response = await gateway.handle_request(2, request)
+            assert isinstance(response, ExceptionResponse)
+            # pymodbus marks an exception PDU with the high bit set.
+            assert response.function_code == request.function_code | 0x80
+            assert response.exception_code == 0x02
+
+        runtime = gateway._devices[2]
+        assert runtime.consecutive_failures == 0
+        assert runtime.open_until is None
+        # Every request reached the bus: the breaker never skipped the device.
+        assert executed == [2] * 5
+
+        live = await gateway.handle_request(
+            1, ReadHoldingRegistersRequest(address=0, count=1, dev_id=1)
+        )
+        assert isinstance(live, ReadHoldingRegistersResponse)
+        assert live.registers == [1]
+    finally:
+        await gateway.stop()
+        await bus_server.stop()
 
 
 @pytest.mark.asyncio

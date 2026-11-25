@@ -15,6 +15,7 @@ Classes:
     - GatewayConfig: Top-level gateway configuration.
 """
 
+import math
 from dataclasses import dataclass, field
 
 from ..config import ModbusSerialConnectionConfigModel
@@ -33,6 +34,63 @@ _MAX_DEVICE_ID = 247
 # Built-in framer shortcuts accepted for the default framer. Uppercase matches
 # FramerType member names and ModbusSerialConnectionConfig.framer.
 _DEFAULT_FRAMER_CHOICES = ("RTU", "ASCII")
+
+# Substitution for an unset serial timeout. The gateway client already uses the
+# same value for the serial transport (``gateway.py``), so the derived budget
+# matches the time one bus transaction may actually take.
+DEFAULT_SERIAL_TIMEOUT = 3.0
+
+# Fixed settle delay pymodbus adds after a successful connect
+# (``AsyncModbusClientMixin.connect``). The hold budget must cover it.
+CONNECT_SETTLE_DELAY = 0.1
+
+# Clients the lock-wait budget tolerates queued ahead of the current one. Four
+# deferred pollers plus the one on the bus (five concurrent clients) covers the
+# ordinary fan-out of an RS485 gateway; anything wider is a load the line
+# cannot serve before a client's own timeout fires anyway.
+DEFAULT_BUS_QUEUE_DEPTH = 4
+
+
+def _derived_bus_timeout(serial_timeout: float, bus_retries: int) -> float:
+    """Maximum time one bus transaction may hold the lock.
+
+    A transaction first awaits ``_ensure_connected``: the connect attempt is
+    bounded by the serial timeout and the client adds a fixed settle sleep.
+    Only then does ``execute`` run ``bus_retries + 1`` attempts of one serial
+    timeout each.
+    """
+    return serial_timeout + CONNECT_SETTLE_DELAY + (bus_retries + 1) * serial_timeout
+
+
+def _resync_overhead(serial_timeout: float) -> float:
+    """Bound on the extra lock time one resync may consume.
+
+    A resync closes the transport, reopens it (one serial timeout plus the
+    client's fixed settle sleep) and then quarantines the line until the
+    abandoned reply window has closed (one serial timeout). The two stages are
+    treated as serial rather than overlapping, which over-approximates the
+    measured cost: with the quarantine recomputed after the reopen, a slow
+    connect eats into the window instead of extending it. The slack is kept
+    because the value is also published to clients as part of their timeout.
+    """
+    return serial_timeout + CONNECT_SETTLE_DELAY + serial_timeout
+
+
+def _derived_request_timeout(
+    bus_timeout: float, serial_timeout: float, bus_queue_depth: int
+) -> float:
+    """Maximum time a client may wait for the bus lock.
+
+    A client can be queued behind the holder plus ``bus_queue_depth`` waiting
+    clients. At most one of the holders ahead of it may have to resync the bus
+    after a dirty event, so every holder cycle is budgeted as one hold plus the
+    resync bound; one serial timeout of slack follows so the request still gets
+    its turn at the head of the queue. Repeated hold expiries can dirty the bus
+    again and legitimately exhaust this budget: that is real congestion, not a
+    derivation error.
+    """
+    cycle = bus_timeout + _resync_overhead(serial_timeout)
+    return cycle * (bus_queue_depth + 1) + serial_timeout
 
 
 @dataclass(slots=True)
@@ -124,6 +182,27 @@ class GatewayConfig:
         bus_retries (int): Retry count for bus transactions.
         circuit_breaker (GatewayCircuitBreakerConfig): Per-device circuit
             breaker settings.
+        bus_queue_depth (int): Clients the lock-wait budget tolerates queued
+            ahead of the current request. ``0`` assumes only the client on the
+            bus is ahead, i.e. the old single-waiter budget.
+        request_timeout (float | None): Maximum seconds a client waits to
+            acquire the bus lock. None selects
+            ``(bus_timeout + 2 * serial_timeout + 0.1) * (bus_queue_depth + 1)
+            + serial_timeout``: one hold per client ahead of it, one resync
+            (reconnect plus quarantine) for the single dirty event covered, and
+            one serial timeout of slack.
+        bus_timeout (float | None): Maximum seconds a single request may hold
+            the bus lock, covering the reconnect plus every bus attempt. None
+            selects ``serial_timeout + 0.1 + (bus_retries + 1) * serial_timeout``,
+            where ``serial_timeout`` is the effective serial timeout (3 s when
+            unset). The fixed 0.1 s is pymodbus's post-connect settle sleep.
+        resync_window (float): Read-only response window the bus is quarantined
+            for after an abandoned transaction. Derived from the effective
+            serial timeout at construction.
+        client_timeout_floor (float): Read-only lower bound for a client's
+            per-request socket timeout: ``request_timeout + bus_timeout +
+            2 * serial_timeout + 0.1``. A client that times out at or below this
+            value can abandon a request the gateway is still able to serve.
     """
 
     serial: ModbusSerialConnectionConfigModel
@@ -136,6 +215,22 @@ class GatewayConfig:
     circuit_breaker: GatewayCircuitBreakerConfig = field(
         default_factory=GatewayCircuitBreakerConfig
     )
+    bus_queue_depth: int = DEFAULT_BUS_QUEUE_DEPTH
+    request_timeout: float | None = None
+    bus_timeout: float | None = None
+    # Frozen at construction: a later mutation of serial.timeout must not change
+    # a budget that request_timeout was derived from.
+    _resync_window: float = field(init=False, default=0.0, repr=False, compare=False)
+
+    @property
+    def resync_window(self) -> float:
+        """Seconds the bus is quarantined after an abandoned transaction."""
+        return self._resync_window
+
+    @property
+    def client_timeout_floor(self) -> float:
+        """Lower bound for a client's per-request socket timeout."""
+        return self.request_timeout + self.bus_timeout + _resync_overhead(self._resync_window)
 
     def __post_init__(self) -> None:
         if not isinstance(self.serial, ModbusSerialConnectionConfigModel):
@@ -165,3 +260,44 @@ class GatewayConfig:
                 raise GatewayConfigError(
                     f"devices key {device_id} does not match device_id {device.device_id}"
                 )
+        if not isinstance(self.bus_queue_depth, int) or isinstance(self.bus_queue_depth, bool):
+            raise GatewayConfigError(
+                f"bus_queue_depth must be an int, got: {type(self.bus_queue_depth)}"
+            )
+        if self.bus_queue_depth < 0:
+            raise GatewayConfigError(
+                f"bus_queue_depth cannot be negative, got: {self.bus_queue_depth}"
+            )
+
+        serial_timeout = (
+            self.serial.timeout if self.serial.timeout is not None else DEFAULT_SERIAL_TIMEOUT
+        )
+        # The resync window sleeps inside the lock, so it has to obey the same
+        # rules as the explicit budgets: an infinite or zero window either
+        # stalls the bus forever or silently disables the quarantine.
+        _validate_budget("resync window", serial_timeout)
+        self._resync_window = float(serial_timeout)
+        bus_timeout = self.bus_timeout
+        if bus_timeout is None:
+            bus_timeout = _derived_bus_timeout(serial_timeout, self.bus_retries)
+        else:
+            _validate_budget("bus_timeout", bus_timeout)
+        request_timeout = self.request_timeout
+        if request_timeout is None:
+            request_timeout = _derived_request_timeout(
+                bus_timeout, serial_timeout, self.bus_queue_depth
+            )
+        else:
+            _validate_budget("request_timeout", request_timeout)
+        self.bus_timeout = bus_timeout
+        self.request_timeout = request_timeout
+
+
+def _validate_budget(name: str, value: float) -> None:
+    """Reject non-numeric, non-finite, or non-positive request budgets."""
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise GatewayConfigError(f"{name} must be a number, got: {type(value)}")
+    if not math.isfinite(value):
+        raise GatewayConfigError(f"{name} must be finite, got: {value}")
+    if value <= 0:
+        raise GatewayConfigError(f"{name} must be positive, got: {value}")

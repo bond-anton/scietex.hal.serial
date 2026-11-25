@@ -13,11 +13,35 @@ Concurrency: the bus is one physical line, so all bus access is serialized by
 a single `asyncio.Lock`. The framer is swapped only when the target device's
 framer differs from the currently-installed one (smart swap).
 
+Both the wait for the lock and the time a request may hold it are bounded:
+`GatewayConfig.request_timeout` (scaled by `GatewayConfig.bus_queue_depth`) and
+`GatewayConfig.bus_timeout`. A wedged device therefore costs at most one hold
+budget instead of stalling every client on the port indefinitely. A holder that
+has to resynchronize the bus adds one bounded resync on top of its hold.
+
+Client contract: a *successful* request can take up to
+``request_timeout + bus_timeout + resync`` wall-clock seconds, where ``resync``
+is ``2 * serial_timeout + 0.1`` (reconnect plus quarantine). That sum is
+published as ``GatewayConfig.client_timeout_floor``; a client's per-request
+socket timeout must **exceed** it. When a client times out first it sees only
+its own library's timeout -- no Modbus exception PDU, and no gateway metric,
+because the gateway cannot observe the disconnect. The request may still be
+executing, so a retry queues behind it.
+
+A hold-budget expiry cancels a transaction that is already on the wire, and
+pymodbus performs no flush, drain, or reconnect when that happens. RTU frames
+carry no usable transaction id, so the abandoned device's late reply would be
+accepted as the answer to the next request for the same device id. Expiry
+therefore marks the bus dirty; the next client closes and reopens the
+transport and lets the response window expire before it transmits
+(`ModbusGateway._resync_bus`).
+
 See ``docs/design/modbus-gateway.md`` and
 ``docs/design/modbus-gateway-nonstandard.md``.
 """
 
 import asyncio
+import math
 import time
 from logging import Logger, getLogger
 
@@ -28,7 +52,7 @@ from pymodbus.pdu import DecodePDU, ExceptionResponse, ModbusPDU
 from pymodbus.transaction import TransactionManager
 
 from .config import GatewayConfig, GatewayDeviceConfig
-from .exceptions import GatewayError
+from .exceptions import GatewayConfigError, GatewayError
 from .metrics import GatewayMetrics
 from .plugin_loader import (
     build_framer,
@@ -39,7 +63,32 @@ from .plugin_loader import (
 )
 
 # Modbus exception code for "gateway target device failed to respond".
-_GATEWAY_TARGET_FAILED = 0x0B
+_TARGET_FAILED = 0x0B
+# Modbus exception code for "server device busy": the request was never put on
+# the wire, so the target device must not be reported as failed.
+_SERVER_DEVICE_BUSY = 0x06
+
+
+def _resolved_budget(name: str, value: float | None) -> float:
+    """
+    Freeze a request budget at gateway construction.
+
+    `GatewayConfig` resolves ``None`` to a derived default, but the config is a
+    mutable dataclass: a budget that was reset after construction would reach
+    ``asyncio.wait_for(timeout=None)`` and wait forever. Validate instead of
+    casting the value, and fail at construction where the mistake is made.
+
+    Raises:
+        GatewayConfigError: If the budget is missing, non-numeric, non-finite,
+            or not positive.
+    """
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise GatewayConfigError(f"{name} must be a number, got: {value!r}")
+    if not math.isfinite(value):
+        raise GatewayConfigError(f"{name} must be finite, got: {value}")
+    if value <= 0:
+        raise GatewayConfigError(f"{name} must be positive, got: {value}")
+    return float(value)
 
 
 class _DeviceRuntime:
@@ -88,6 +137,16 @@ class ModbusGateway:
         self._devices: dict[int, _DeviceRuntime] = {}
         self._default_runtime: _DeviceRuntime | None = None
         self._metrics = GatewayMetrics()
+        # The budgets are frozen here on purpose. `GatewayConfig` resolves None
+        # to derived defaults, but it stays mutable, so re-reading a budget at
+        # request time could turn `wait_for(timeout=...)` into an unbounded wait.
+        self._request_timeout = _resolved_budget("request_timeout", config.request_timeout)
+        self._hold_timeout = _resolved_budget("bus_timeout", config.bus_timeout)
+        # The resync window sleeps inside the lock, so it is validated like the
+        # other budgets: zero would silently disable the quarantine, and inf
+        # would sleep forever while holding the bus.
+        self._resync_window = _resolved_budget("resync_window", config.resync_window)
+        self._resync_deadline: float | None = None
 
     # -- telemetry ---------------------------------------------------------
 
@@ -224,7 +283,9 @@ class ModbusGateway:
 
         This is the transport-agnostic entry point used by the TCP server. It
         never raises for bus/device failures: those are mapped to a Modbus
-        exception response (0x0B) so the TCP connection stays open.
+        exception response (0x0B) so the TCP connection stays open. A request
+        that could not even reach the bus before its lock-wait budget expired
+        returns 0x06 instead, because the target device never failed.
 
         Args:
             device_id (int): Target device id.
@@ -239,20 +300,20 @@ class ModbusGateway:
             self.logger.warning("%s", exc)
             self._metrics.record_request(device_id)
             self._metrics.record_error(device_id)
-            return ExceptionResponse(request.function_code, _GATEWAY_TARGET_FAILED)
+            return ExceptionResponse(request.function_code, _TARGET_FAILED)
 
         self._metrics.record_request(device_id)
         self._metrics.touch(device_id)
         if self._circuit_open(device_id, runtime):
             self._metrics.record_error(device_id)
-            return ExceptionResponse(request.function_code, _GATEWAY_TARGET_FAILED)
+            return ExceptionResponse(request.function_code, _TARGET_FAILED)
         try:
             return await self._forward(device_id, request, runtime)
         except (ModbusException, GatewayError, asyncio.TimeoutError) as exc:
             self.logger.error("Bus failure for device %s: %s", device_id, exc)
             self._metrics.record_error(device_id)
             self._record_failure(device_id, runtime)
-            return ExceptionResponse(request.function_code, _GATEWAY_TARGET_FAILED)
+            return ExceptionResponse(request.function_code, _TARGET_FAILED)
 
     def _circuit_open(self, device_id: int, runtime: _DeviceRuntime) -> bool:
         """Whether the device is currently skipped by the circuit breaker."""
@@ -317,8 +378,29 @@ class ModbusGateway:
     async def _forward(
         self, device_id: int, request: ModbusPDU, runtime: _DeviceRuntime
     ) -> ModbusPDU:
-        """Translate, swap framer, execute, and translate back."""
-        if self._bus is None:
+        """Translate, swap framer, execute, and translate back.
+
+        A request that cannot acquire the lock within ``request_timeout`` is
+        rejected with 0x06 without touching the bus; it does not count against
+        the device's breaker because the device was never addressed. It is also
+        not booked through `GatewayMetrics.record_error`: that counter is
+        documented as gateway-level 0x0B failures, and no device failed here.
+        The request is still counted by ``record_request``; there is no separate
+        busy counter.
+
+        A request whose transaction outlives ``bus_timeout`` is abandoned, which
+        leaves its reply in flight: the bus is marked dirty (see `_resync_bus`)
+        and the request raises `GatewayError`, which `handle_request` maps to
+        0x0B and charges to the target device's breaker.
+
+        A device that answers with an `ExceptionResponse` is healthy: it
+        responded promptly, so the breaker is not charged. Counting device
+        exceptions would let any network peer open the breaker of a working
+        device for ``cooldown`` seconds, and ``isError()`` also flags vendor
+        PDUs whose normal function code happens to exceed 0x80.
+        """
+        bus = self._bus
+        if bus is None:
             raise GatewayError("Gateway bus is not started")
 
         vendor_request = request
@@ -326,15 +408,135 @@ class ModbusGateway:
             vendor_request = runtime.translator.to_vendor(request)
         vendor_request.dev_id = device_id
 
-        async with self._lock:
-            await self._ensure_connected()
-            if self._current_framer is not runtime.framer:
-                self._bus.ctx.framer = runtime.framer
-                self._current_framer = runtime.framer
-            vendor_response = await self._bus.execute(False, vendor_request)
+        try:
+            await asyncio.wait_for(self._lock.acquire(), timeout=self._request_timeout)
+        except asyncio.TimeoutError:
+            self.logger.warning(
+                "Device %s waited more than %.2f s for the bus; rejecting the request",
+                device_id,
+                self._request_timeout,
+            )
+            return ExceptionResponse(request.function_code, _SERVER_DEVICE_BUSY)
+
+        try:
+            await self._resync_bus(bus)
+            vendor_response = await self._execute_within_hold(
+                bus, runtime, vendor_request, device_id
+            )
+        finally:
+            self._lock.release()
 
         self._metrics.record_retries(device_id, getattr(vendor_response, "retries", 0))
         self._record_success(device_id, runtime)
         if runtime.translator is not None:
             return runtime.translator.to_standard(vendor_response)
         return vendor_response
+
+    async def _execute_within_hold(
+        self,
+        bus: AsyncModbusSerialClient,
+        runtime: _DeviceRuntime,
+        vendor_request: ModbusPDU,
+        device_id: int,
+    ) -> ModbusPDU:
+        """Run the transaction and enforce the hold budget at the gateway layer.
+
+        The budget is enforced with `asyncio.wait` rather than
+        `asyncio.wait_for`: pymodbus converts the cancellation that `wait_for`
+        injects into a ``ModbusIOException`` ("Request cancelled outside
+        library") on an established transport, so catching `TimeoutError` never
+        fires. Waiting on the task separately makes expiry observable no matter
+        what exception pymodbus raises.
+
+        Raises:
+            GatewayError: If the budget expired; the bus is marked dirty first.
+        """
+        task = asyncio.ensure_future(self._transact(bus, runtime, vendor_request))
+        try:
+            done, _ = await asyncio.wait({task}, timeout=self._hold_timeout)
+        except asyncio.CancelledError:
+            # An external cancel (shutdown, caller timeout) also abandons an
+            # in-flight write, so the bus is just as dirty as a budget expiry.
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            self._mark_bus_dirty()
+            raise
+        if done:
+            return task.result()
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        self._mark_bus_dirty()
+        raise GatewayError(
+            f"Device {device_id} held the bus longer than {self._hold_timeout:.2f} s"
+        )
+
+    def _mark_bus_dirty(self) -> None:
+        """Arm the resync state after a transaction was abandoned on the wire.
+
+        The abandoned request may still be answered. RTU has no usable
+        transaction id and frames are matched by device id, so that reply would
+        be taken as the answer to the next request for the same device. The
+        window is one response window measured from now: the last write
+        happened no later than this instant, and an attempt's reply cannot
+        legitimately arrive more than one serial timeout after its write.
+        """
+        self._resync_deadline = time.monotonic() + self._resync_window
+        self.logger.warning(
+            "Bus carries an abandoned transaction; resynchronizing before the next request"
+        )
+
+    async def _resync_bus(self, bus: AsyncModbusSerialClient) -> None:
+        """Close and reopen the transport, then let the abandoned reply window expire.
+
+        Closing the port discards the OS receive buffer; reopening clears
+        pymodbus's ``recv_buffer`` and reinstalls the framer. Anything the
+        abandoned device sends during the remaining response window is decoded
+        against a response future that is already done, so pymodbus drops it.
+        The client then transmits only after that window has closed.
+
+        The quarantine deadline is absolute, so the connect overhead is not
+        added to it: the sleep is recomputed after the reopen and is 0 when the
+        reopen already consumed the window. A successful resync -- reopen plus
+        elapsed window -- clears the dirty flag here, independent of the next
+        transaction's outcome. A transaction that then fails for an unrelated
+        reason (absent device, pymodbus timeout) does not force another
+        reconnect. The flag stays armed only when the reopen itself fails, and
+        the next request retries the resync.
+
+        Raises:
+            GatewayError: If the transport cannot be reopened; the resync state
+                stays armed so the next request tries again.
+        """
+        deadline = self._resync_deadline
+        if deadline is None:
+            return
+        self.logger.warning(
+            "Resynchronizing the bus for up to %.2f s after an abandoned transaction",
+            max(0.0, deadline - time.monotonic()),
+        )
+        bus.close()
+        # Force `_transact` to reinstall the device framer on the new transport.
+        self._current_framer = None
+        if not await bus.connect():
+            raise GatewayError(f"Gateway bus could not be reopened on {self.config.serial.port}")
+        # Recompute after the reopen: a slow connect must not extend the
+        # quarantine past the deadline it was measured from.
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            await asyncio.sleep(remaining)
+        self._resync_deadline = None
+        # Drop a partial frame the framer may have buffered while draining.
+        bus.ctx.recv_buffer = b""
+
+    async def _transact(
+        self,
+        bus: AsyncModbusSerialClient,
+        runtime: _DeviceRuntime,
+        vendor_request: ModbusPDU,
+    ) -> ModbusPDU:
+        """Reconnect if needed, install the device framer, and execute."""
+        await self._ensure_connected()
+        if self._current_framer is not runtime.framer:
+            bus.ctx.framer = runtime.framer
+            self._current_framer = runtime.framer
+        return await bus.execute(False, vendor_request)
