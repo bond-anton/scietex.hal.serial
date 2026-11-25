@@ -108,6 +108,11 @@ A bus or device failure is returned to the TCP client as a Modbus exception
 response (code `0x0B`, gateway target failed to respond). The TCP connection
 stays open, so the client can retry. `handle_request` never raises.
 
+A request that cannot acquire the shared bus within the lock-wait budget is
+answered with exception `0x06` (server device busy) instead. The target device
+was never addressed, so this is contention on the line rather than a device
+fault: a client should back off and retry, not mark the device dead.
+
 ### Missing serial port
 
 `start()` does not fail when the serial port cannot be opened (for example, a

@@ -665,11 +665,11 @@ async def test_dirty_bus_lock_wait_covers_one_resync(vsp_fixture, logger_fixture
     not a derivation error. Only one resync per dirty event is covered here.
     """
     serial_timeout = 0.6
-    hold_timeout = 0.3
+    hold_timeout = 1.5
     response = ReadHoldingRegistersResponse(registers=[7])
     bus = _ScriptedBus(
         connect_delay=2 * serial_timeout,
-        hold_delay=0.22,
+        hold_delay=0.5,
         execute_results=[response],
     )
     gateway, config = _scripted_gateway(
@@ -693,6 +693,9 @@ async def test_dirty_bus_lock_wait_covers_one_resync(vsp_fixture, logger_fixture
 
     assert all(isinstance(item, ReadHoldingRegistersResponse) for item in responses)
     assert all(not isinstance(item, ExceptionResponse) for item in responses)
+    # A hold that expires at the budget would be cancelled before it could
+    # record its duration, so the gap between the scripted 0.5 s and the 1.5 s
+    # budget is wide enough to survive scheduling jitter under ``-n auto``.
     assert max(bus.hold_durations) < hold_timeout
     # One dirty event, one resync; the successful reopen cleared the flag.
     assert bus.connects == 1
@@ -747,18 +750,19 @@ async def test_resync_quarantine_is_not_extended_by_the_reopen(vsp_fixture, logg
     having a full window appended after it.
     """
     bus = _ScriptedBus(
-        connect_delay=0.3,
+        connect_delay=1.0,
         execute_results=[ReadHoldingRegistersResponse(registers=[7])],
     )
-    gateway, _ = _scripted_gateway(vsp_fixture, logger_fixture, bus, serial_timeout=0.2)
+    gateway, _ = _scripted_gateway(vsp_fixture, logger_fixture, bus, serial_timeout=1.0)
     gateway._mark_bus_dirty()
     started = time.monotonic()
     await gateway._resync_bus(bus)
     elapsed = time.monotonic() - started
 
-    # Pre-recompute behavior would sleep the full 0.2 s window after the 0.3 s
-    # connect; the fix returns as soon as the connect finishes.
-    assert elapsed < 0.4
+    # The connect alone is 1.0 s and consumes the 1.0 s window, so a correct
+    # resync returns at ~1.0 s. Appending the full window after the connect
+    # would take ~2.0 s: the threshold sits 0.5 s away from either outcome.
+    assert elapsed < 1.5
     assert bus.connects == 1
     assert gateway._resync_deadline is None
 
@@ -899,13 +903,17 @@ async def test_wedged_device_does_not_block_a_concurrent_client(
         started = time.monotonic()
         live = await asyncio.wait_for(
             gateway.handle_request(1, ReadHoldingRegistersRequest(address=0, count=1, dev_id=1)),
-            timeout=2.0,
+            timeout=5.0,
         )
         elapsed = time.monotonic() - started
 
         assert isinstance(live, ReadHoldingRegistersResponse)
         assert live.registers == [1]
-        assert elapsed < 1.0
+        # The live client waits out the holder's 0.2 s budget and the 0.5 s
+        # quarantine, so a correct gateway answers at ~0.7 s. An unbounded hold
+        # would still be sleeping after 5 s: the wait_for is the wide detector,
+        # and 2.0 s keeps a ~1.3 s margin over the fixed cost.
+        assert elapsed < 2.0
         assert isinstance(await wedged, ExceptionResponse)
     finally:
         await gateway.stop()
@@ -1000,6 +1008,79 @@ async def test_hold_expiry_detected_when_pymodbus_converts_the_cancellation(
     finally:
         await gateway.stop()
         await bus_server.stop()
+
+
+class _SlowUnwindBus:
+    """A bus whose cancellation handler re-enters the gateway's cleanup.
+
+    pymodbus can swallow the cancellation of an in-flight transaction and only
+    finish unwinding later, which keeps the gateway waiting on it. This bus
+    reproduces that window deterministically: its cancellation handler cancels
+    the surrounding request again, so the second cancel lands while that request
+    is still draining this task.
+    """
+
+    def __init__(self) -> None:
+        self.ctx = SimpleNamespace(transport=object(), framer=None, recv_buffer=b"")
+        self.started = asyncio.Event()
+        self.request_task: asyncio.Task | None = None
+
+    def close(self) -> None:
+        self.ctx.transport = None
+
+    async def connect(self) -> bool:
+        self.ctx.transport = object()
+        return True
+
+    async def execute(self, no_response_expected, request):
+        self.started.set()
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            if self.request_task is not None:
+                self.request_task.cancel()
+            raise
+
+
+@pytest.mark.asyncio
+async def test_cancelled_drain_still_marks_the_bus_dirty(vsp_fixture, logger_fixture):
+    """A cancel that lands while the abandoned transaction drains still arms the resync.
+
+    The write is already on the wire when the drain starts, so the mark must run
+    on every path out of the cleanup -- including a second cancellation that
+    interrupts the wait for the transaction task to finish.
+    """
+    bus = _SlowUnwindBus()
+    gateway, _ = _scripted_gateway(
+        vsp_fixture, logger_fixture, bus, serial_timeout=0.2, bus_timeout=5.0
+    )
+    try:
+        walk = asyncio.create_task(
+            gateway.handle_request(1, ReadHoldingRegistersRequest(address=0, count=1, dev_id=1))
+        )
+        bus.request_task = walk
+        await asyncio.wait_for(bus.started.wait(), timeout=2.0)
+
+        walk.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await walk
+
+        assert gateway._resync_deadline is not None
+        assert gateway._resync_deadline > time.monotonic()
+    finally:
+        await gateway.stop()
+
+
+@pytest.mark.asyncio
+async def test_stop_clears_the_resync_deadline(vsp_fixture, logger_fixture):
+    """A restarted gateway does not inherit a quarantine measured before the close."""
+    bus = _ScriptedBus(execute_results=[ReadHoldingRegistersResponse(registers=[7])])
+    gateway, _ = _scripted_gateway(vsp_fixture, logger_fixture, bus)
+    gateway._mark_bus_dirty()
+    assert gateway._resync_deadline is not None
+
+    await gateway.stop()
+    assert gateway._resync_deadline is None
 
 
 def test_gateway_rejects_a_budget_reset_to_none(vsp_fixture, logger_fixture):

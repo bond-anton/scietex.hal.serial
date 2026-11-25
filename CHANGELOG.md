@@ -24,7 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `request_timeout + bus_timeout + 2 * serial_timeout + 0.1`. A client that
   times out first sees only its own library timeout -- no Modbus exception PDU
   and no gateway metric, since the gateway cannot observe the disconnect -- and
-  its request may still be executing, so a retry queues behind it. The resync
+  its request may still be executing, so a retry queues behind it. The floor is
+  computed once at construction from the concretized budgets, so mutating
+  `request_timeout`/`bus_timeout` afterwards cannot publish a floor that
+  disagrees with the budgets the gateway actually enforces. The resync
   response window (`GatewayConfig.resync_window`) is validated at construction
   like the other budgets: zero, negative, non-finite, and non-numeric values are
   rejected.
@@ -46,6 +49,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as a failure by the circuit breaker. It responded, so it is alive; counting
   device exceptions let any network peer open a healthy device's breaker, and
   `isError()` also flags vendor PDUs whose normal function code exceeds `0x80`.
+- The dirty-bus mark is armed on every cancellation path of the cleanup that
+  follows an abandoned transaction, not just when the cleanup completes. A
+  second cancellation (a shutdown, or a pymodbus transaction that swallows the
+  first one and finishes later) used to skip the mark, which let a late reply
+  answer the next request for the same device id. `stop()` also clears the
+  resync state, so a restarted gateway does not pay a close/reopen and the
+  quarantine sleep on its first request.
+- The gateway example derives its client timeout from
+  `GatewayConfig.client_timeout_floor` instead of a hard-coded 1 s, which was
+  below the floor its own configuration published.
 - A lock-wait rejection (`0x06`) is no longer booked as a device error in the
   gateway metrics: no device failed, and `GatewayMetrics.errors` documents
   gateway-level `0x0B` failures. The request is still counted by

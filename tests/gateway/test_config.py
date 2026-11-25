@@ -224,6 +224,25 @@ def test_gateway_config_freezes_the_resync_window(
     assert config.resync_window == 0.5
 
 
+def test_gateway_config_freezes_the_client_timeout_floor(
+    serial_config: ModbusSerialConnectionConfig,
+) -> None:
+    """A budget mutation after construction cannot move the published floor.
+
+    The gateway freezes its own copy of the budgets, so a floor re-derived from
+    the mutable public fields could disagree with what it actually waits for --
+    and a field reset to ``None`` would raise on read instead.
+    """
+    config = GatewayConfig(serial=serial_config, bus_timeout=1.0, request_timeout=2.0)
+    floor = config.client_timeout_floor
+    # Explicit budgets plus one resync (2 * 3 s serial fallback + 0.1 s settle).
+    assert floor == 2.0 + 1.0 + 6.1
+
+    config.request_timeout = None
+    config.bus_timeout = 100.0
+    assert config.client_timeout_floor == floor
+
+
 @pytest.mark.parametrize("depth", [-1, 1.5, "2"])
 def test_gateway_config_rejects_bad_queue_depth(
     serial_config: ModbusSerialConnectionConfig, depth

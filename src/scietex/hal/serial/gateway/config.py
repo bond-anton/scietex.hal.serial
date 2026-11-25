@@ -200,9 +200,11 @@ class GatewayConfig:
             for after an abandoned transaction. Derived from the effective
             serial timeout at construction.
         client_timeout_floor (float): Read-only lower bound for a client's
-            per-request socket timeout: ``request_timeout + bus_timeout +
-            2 * serial_timeout + 0.1``. A client that times out at or below this
-            value can abandon a request the gateway is still able to serve.
+            per-request socket timeout:
+            ``request_timeout + bus_timeout + 2 * serial_timeout + 0.1``,
+            computed once at construction from the concretized budgets. A
+            client that times out at or below this value can abandon a request
+            the gateway is still able to serve.
     """
 
     serial: ModbusSerialConnectionConfigModel
@@ -221,6 +223,11 @@ class GatewayConfig:
     # Frozen at construction: a later mutation of serial.timeout must not change
     # a budget that request_timeout was derived from.
     _resync_window: float = field(init=False, default=0.0, repr=False, compare=False)
+    # Also frozen: the floor is the sum of the budgets concretized below. The
+    # public fields stay mutable, so re-reading them here could publish a floor
+    # that disagrees with the gateway's frozen copy -- or raise on a reset to
+    # None -- without the gateway actually waiting any shorter.
+    _client_timeout_floor: float = field(init=False, default=0.0, repr=False, compare=False)
 
     @property
     def resync_window(self) -> float:
@@ -230,7 +237,7 @@ class GatewayConfig:
     @property
     def client_timeout_floor(self) -> float:
         """Lower bound for a client's per-request socket timeout."""
-        return self.request_timeout + self.bus_timeout + _resync_overhead(self._resync_window)
+        return self._client_timeout_floor
 
     def __post_init__(self) -> None:
         if not isinstance(self.serial, ModbusSerialConnectionConfigModel):
@@ -291,6 +298,12 @@ class GatewayConfig:
             _validate_budget("request_timeout", request_timeout)
         self.bus_timeout = bus_timeout
         self.request_timeout = request_timeout
+        # Derived once from the concretized budgets. Validated like the other
+        # budgets so a bug in the derivation cannot publish a floor of None,
+        # infinity, or zero, which would tell clients any timeout is safe.
+        floor = request_timeout + bus_timeout + _resync_overhead(self._resync_window)
+        _validate_budget("client_timeout_floor", floor)
+        self._client_timeout_floor = float(floor)
 
 
 def _validate_budget(name: str, value: float) -> None:

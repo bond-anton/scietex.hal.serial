@@ -191,7 +191,13 @@ class ModbusGateway:
             )
 
     async def stop(self) -> None:
-        """Close the serial bus. Idempotent."""
+        """Close the serial bus. Idempotent.
+
+        The resync state is cleared too: a stopped gateway has no transport to
+        resynchronize, and a restart that inherited the deadline would pay a
+        close/reopen plus the quarantine sleep before its first request.
+        """
+        self._resync_deadline = None
         if self._bus is None:
             return
         self._bus.close()
@@ -448,6 +454,10 @@ class ModbusGateway:
         fires. Waiting on the task separately makes expiry observable no matter
         what exception pymodbus raises.
 
+        Both an expiry and a cancellation abandon a write that may still be
+        answered, so both go through `_abandon_transaction`, which marks the bus
+        dirty on every path out of its cleanup.
+
         Raises:
             GatewayError: If the budget expired; the bus is marked dirty first.
         """
@@ -457,18 +467,36 @@ class ModbusGateway:
         except asyncio.CancelledError:
             # An external cancel (shutdown, caller timeout) also abandons an
             # in-flight write, so the bus is just as dirty as a budget expiry.
-            task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
-            self._mark_bus_dirty()
+            await self._abandon_transaction(task)
             raise
         if done:
             return task.result()
-        task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
-        self._mark_bus_dirty()
+        await self._abandon_transaction(task)
         raise GatewayError(
             f"Device {device_id} held the bus longer than {self._hold_timeout:.2f} s"
         )
+
+    async def _abandon_transaction(self, task: asyncio.Task[ModbusPDU]) -> None:
+        """Cancel an in-flight transaction and mark the bus dirty.
+
+        The mark runs in a ``finally`` because this coroutine can itself be
+        cancelled while it waits for the transaction to unwind: pymodbus may
+        swallow the first cancellation and finish later, so the surrounding
+        request can be cancelled a second time during the drain. The write is
+        already on the wire on that path, so a skipped mark would let the next
+        request accept its late reply as its own answer.
+
+        The drain is not shielded. A cancellation that arrives mid-drain
+        interrupts the ``gather`` before the transaction task reaches its final
+        state, but the task has been cancelled and the armed deadline makes the
+        next request close and reopen the transport, which discards whatever it
+        still sends.
+        """
+        task.cancel()
+        try:
+            await asyncio.gather(task, return_exceptions=True)
+        finally:
+            self._mark_bus_dirty()
 
     def _mark_bus_dirty(self) -> None:
         """Arm the resync state after a transaction was abandoned on the wire.

@@ -41,7 +41,14 @@ async def main() -> None:
     await gateway.start()
     await tcp_server.start()
 
-    client = AsyncModbusTcpClient("127.0.0.1", port=GATEWAY_PORT, timeout=1)
+    client = AsyncModbusTcpClient(
+        "127.0.0.1",
+        port=GATEWAY_PORT,
+        # The gateway may legitimately hold a request for up to
+        # `client_timeout_floor` seconds; a client that gives up earlier sees
+        # only its own library's timeout while the gateway keeps working.
+        timeout=config.client_timeout_floor + 5.0,
+    )
     try:
         await client.connect()
         read = await client.read_holding_registers(address=0, count=5, device_id=1)
